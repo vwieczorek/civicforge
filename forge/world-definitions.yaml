@@ -1,0 +1,6 @@
+# Stub for world-specific definitions
+
+# Each world customizes CivicForge for its community.
+worlds:
+  - name: example
+    description: Example world template
