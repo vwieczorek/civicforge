@@ -8,7 +8,7 @@ Welcome to a new kind of online platform driven by real identities, meaningful a
 
 ## Why a New Approach?
 
-Traditional forums and social networks often optimized for clicks and outrage, overlooking community health. We learned from the failures of the past: the anonymity anarchy of early forums, the neglected moderation of other platforms, and the engagement-at-all-costs ethos of big social media. Instead, we’re building with accountability and purpose from day one. Every design choice – from real-name accounts to task-based “quests” – serves our core goal: turning constructive conversation into coordinated action, while ensuring everyone feels safe and heard.
+Traditional forums and social networks often optimized for clicks and outrage, overlooking community health. We learned from the failures of the past: the anonymity anarchy of early forums, the neglected moderation of mid-2000s platforms, and the engagement-at-all-costs ethos of big social media. Instead, we’re building with accountability and purpose from day one. Every design choice – from real-name accounts to task-based “quests” – serves our core goal: turning constructive conversation into coordinated action, while ensuring everyone feels safe and heard.
 
 ---
 
@@ -16,7 +16,7 @@ Traditional forums and social networks often optimized for clicks and outrage, o
 
 We embrace innovation in how people connect and cooperate, but cherish timeless principles of human decency and liberty. We champion open but responsible free speech, healthy disagreement, and emotional safety. Our default tone is positive and constructive, yet we leave space for critique and dissent – negativity is not banned, only channeled productively. We wield radical candor but with compassion and framed by curiosity and learning.
 
-By setting positive defaults (like encouraging praise and solution-oriented feedback) while welcoming respectful criticism, we create an environment that wins hearts and minds without silencing voices. We never lose sight of functionality and core values in pursuit of growth; in other words, we won’t chase vanity metrics at the expense of our mission. We value first-principles thinking.
+By setting positive defaults (like encouraging praise and solution-oriented feedback) while welcoming respectful criticism, we create an environment that wins hearts and minds without silencing voices. We never lose sight of functionality and core values in pursuit of growth; in other words, we won’t chase vanity metrics at the expense of our mission.
 
 ---
 
@@ -28,9 +28,9 @@ Our community is built on foundational values that guide every interaction and d
 - **Respectful Pluralism:** We celebrate diversity of perspective. Disagreement and debate are welcome – so long as it’s done with respect. Critique ideas, not people. No harassment, ad hominem attacks, or hate speech are tolerated.
 - **Mutual Grace & Resilience:** Both speaker and listener share responsibility: strive not to offend and not to take offense too quickly. We extend good-faith assumptions, forgive honest mistakes, and coach newcomers rather than shame them.
 - **Healthy Dialogue & Emotional Safety:** Our communication culture prioritizes curiosity, empathy, and “good faith” interpretation. We protect against abuse without cultivating a fragile “victim mindset.” Debate focuses on content, not personal digs.
-- **Positive-Sum Collaboration:** We reject zero-sum thinking. Our platform works so that one member’s success helps others succeed too. We emphasize cooperation over competition, and celebrate group achievements.
+- **Positive-Sum Collaboration:** We reject zero-sum thinking. Our platform is designed so that one member’s success helps others succeed too. We emphasize cooperation over competition, and celebrate group achievements.
 - **Transparency and Trust:** Secrecy and ambiguity erode communities. We strive to be transparent about our policies, decisions, and how the platform operates. Governance rules are public, and moderation actions are logged and explained.
-- **Growth and Adaptability:** No system is perfect – what matters is the ability to learn and adapt. We aim to build robust, customizable, self-correcting mechanisms so the community can weather challenges and improve over time.
+- **Growth and Adaptability:** No system is perfect – what matters is the ability to learn and adapt. We build robust, self-correcting mechanisms so the community can weather challenges and improve over time.
 
 ---
 
@@ -49,7 +49,7 @@ Every user goes by their verified name or identity. With this accountability com
 
 #### Grace Loop: curiosity → clarification → correction → growth.
 
-No name-calling or slurs, no personal attacks, avoid sarcasm in serious discussions, askrather than assume, and give private feedback when possible.
+No name-calling or slurs, no personal attacks, avoid sarcasm in serious discussions, ask rather than assume, and give private feedback when possible.
 
 ### 3. Protect, Empower & Coach
 
@@ -61,13 +61,13 @@ Our platform centers on a task-board for taking action. Honor your commitments, 
 
 ### 5. Positive Defaults (With Room for Critique)
 
-Start discussions and tasks with optimism and solution-orientation. Feedback should start positive before noting concerns. Dissent and frustration are welcome as long as it’s done respectfully.
+Start discussions and tasks with optimism and solution-orientation. Feedback should start positive before noting concerns. Dissent and frustration are welcome in dedicated spaces, as long as it’s done respectfully.
 
 ### 6. Quality Over Hype
 
 - Cite sources or give evidence for factual claims.
 - Write clearly and concisely without sacrificing nuance.
-- No clickbait, lazy posts, or misinformation.
+- No clickbait or misinformation.
 - Share context with outside content.
 - Stay on topic in focused threads.
 
@@ -78,13 +78,57 @@ We don’t optimize for addictive doom-scrolling; our goal is satisfaction and f
 ## Task Board Mechanics & Gamified Engagement
 
 - **Clear Task Design:** Concise descriptions, goals, deadlines, and responsibilities. Visibility creates accountability.
+- **Dual-Attested Completion & Public Ledger** – a quest is only marked *Done* when both the actor **and** the recipient press “Confirm” in a transparent, open, and verifiable ledger  
+- **Encourage ‘Perfect’, Satisfied with ‘Good’: Each quest has at least two definitions of complete: **Done** (meets the brief) and **Exceptional** (goes above-and-beyond), preventing perfectionism from blocking progress while still celebrating excellence.
 - **Gamified Incentives:** Experience points, badges, levels, and leaderboards – but co-op and group wins are the focus, not pure competition. Many contributions are recognized (mentorship, management, content creation).
 - **Preventing Gamification Abuse:** Points and badges motivate, but are never the end-goal. We monitor for abuse and adjust incentives as needed.
+- **Build → Measure → Delete** – experiments that fail the mission are sunset quickly and their lessons documented.  We bias for deletion over zombie features.
+- **Explicit Product Metrics** – we publicly track *Verified Actions per Active User* and an abuse-rate ceiling.  Metrics guide; they never override values.
+- **Advertising as Bridge Fuel** – ads are allowed but discouraged, viewed as a sometimes necessary means as a temporary path to ad-free self-sufficiency.
+- **No Malicious-Compliance Loopholes** – protocol blocks insider capture, monopolies, or other bad-faith exploits; appeals run first at the World level, then at The Forge.
 - **Cultural Norms from Gaming:** Approach tasks with good spirits, celebrate wins, communicate before rage-quitting, and mentor newcomers.
 - **Mentorship and Leveling Up:** Newcomers onboard through tasks and learn from seasoned members. Advancement unlocks more responsibility, not just status.
 - **Feedback and Iteration:** Learn from failures, share insights, and iterate on tasks and systems.
 
 ---
+
+## CivicForge Architecture: *Worlds* & **The Forge**
+
+CivicForge is a two-layer ecosystem:
+
+* **World** – a self-contained task board instance tailored to a specific community or mission.  
+  Every World can theme its UI, set local policies, incentives, culture, and govern itself within the constitutional rails.
+
+* **The Forge** – the shared meta-framework that links all Worlds’ task boards.  
+  The Forge handles cross-World federation, coordination, collaboration, standards governance, arbitration of edge-cases, and even friendly leaderboard-style competition so that lessons learned in one World compound for all.
+
+Together these layers let us innovate rapidly at the edge while safeguarding interoperability, portability, and a common civic DNA.
+
+---
+
+## Privacy, Security & Anti-Surveillance Commitments
+
+* **Right to be Forgotten** – any member can trigger an irreversible purge of their data in a timely manner; only anonymised aggregates remain.  
+* **Least-PII Principle** – Worlds store only the minimum needed for auth (hash + display-name by default).  
+* **End-to-End Roadmap** – private content should stay private while efforts are made to proof workflows for abuse detection that do **not** weaken cryptography.  
+* **Quarterly Red-Team Audits** – independent privacy, bias, and security reviews are published every quarter.  
+* **Anti-Surveillance Guard-Rails** – reputation scores are tied solely to completed actions, never to personal attributes; participation is voluntary; no data is correlated with external tracking systems.  
+* **Externalities Considered, Not Fetishised** – we assess environmental and community impact and require mitigation plans, but will not let bureaucracy stall meaningful progress.
+
+---
+
+## User-Experience Mandate — “Positivity from Click One”
+
+| Directive | Guard-Rail |
+|-----------|------------|
+| **AI Guide** instantly turns a plain-language need into a quest, auto-splitting sub-tasks by learning from past community patterns. | Override or edit in two taps; no hostage flows. |
+| **90-Second WOW** – land, post quest, invite recipient in < 90 s. | We time every flow and shave steps until it hurts. |
+| **Zero-Instruction UI** – must pass the “newbie test”; icons + plain labels explain themselves. | Visual / haptic response < 100 ms; no wall-of-text tutorials. |
+| **Mobile- & Accessibility-First** – thumb-reachable, screen-reader friendly, low-bandwidth tolerant. | WCAG AA issues fixed before launch; real-world testers sign off. |
+| **Human-Tone Copy** – verbs, not jargon. | Copy review is part of every PR; text slop rejected at CI. |
+| **World-Level Themes** – each World owns its look within Forge-standardised protocols and safety rails. | Core UX remains recognizable/referencable so users can roam between Worlds without friction. |
+
+—
 
 ## Moderation, Self-Healing, and Adaptation
 
@@ -132,4 +176,4 @@ Now the last ingredient is you. By embracing these norms and participating in go
 
 Let’s set a new standard for online engagement – built on integrity, creativity, and collective empowerment.
 
-**Let’s get to work – together. Welcome to CivicForge!**
+**Let’s get to work – together. Welcome to the community!**
