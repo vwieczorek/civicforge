@@ -175,4 +175,4 @@ Now the last ingredient is you. By embracing these norms and participating in go
 
 Let’s set a new standard for online engagement – built on integrity, creativity, and collective empowerment.
 
-**Let’s get to work – together. Welcome to the community!**
+**Let’s get to work – together. Welcome to CivicForge!**
