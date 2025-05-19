@@ -1,4 +1,4 @@
-# Building a Better Online Community: Rules, Norms, and Governance
+# CivicForge: Rules, Norms, and Governance
 
 ## Our Vision: An Accountable, Action-Oriented Community
 
