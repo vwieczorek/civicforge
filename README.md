@@ -128,7 +128,7 @@ Together these layers let us innovate rapidly at the edge while safeguarding int
 | **Human-Tone Copy** – verbs, not jargon. | Copy review is part of every PR; text slop rejected at CI. |
 | **World-Level Themes** – each World owns its look within Forge-standardised protocols and safety rails. | Core UX remains recognizable/referencable so users can roam between Worlds without friction. |
 
-—--
+---
 
 ## Moderation, Self-Healing, and Adaptation
 
