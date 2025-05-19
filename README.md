@@ -79,7 +79,7 @@ We don’t optimize for addictive doom-scrolling; our goal is satisfaction and f
 
 - **Clear Task Design:** Concise descriptions, goals, deadlines, and responsibilities. Visibility creates accountability.
 - **Dual-Attested Completion & Public Ledger** – a quest is only marked *Done* when both the actor **and** the recipient press “Confirm” in a transparent, open, and verifiable ledger  
-- **Encourage ‘Perfect’, Satisfied with ‘Good’: Each quest has at least two definitions of complete: **Done** (meets the brief) and **Exceptional** (goes above-and-beyond), preventing perfectionism from blocking progress while still celebrating excellence.
+- **Strive for ‘Perfect’; Satisfied with ‘Good’**: Each quest has at least two definitions of complete: **Done** (meets the brief) and **Exceptional** (goes above-and-beyond), preventing perfectionism from blocking progress while still celebrating excellence.
 - **Gamified Incentives:** Experience points, badges, levels, and leaderboards – but co-op and group wins are the focus, not pure competition. Many contributions are recognized (mentorship, management, content creation).
 - **Preventing Gamification Abuse:** Points and badges motivate, but are never the end-goal. We monitor for abuse and adjust incentives as needed.
 - **Build → Measure → Delete** – experiments that fail the mission are sunset quickly and their lessons documented.  We bias for deletion over zombie features.
@@ -98,7 +98,6 @@ CivicForge is a two-layer ecosystem:
 
 * **World** – a self-contained task board instance tailored to a specific community or mission.  
   Every World can theme its UI, set local policies, incentives, culture, and govern itself within the constitutional rails.
-
 * **The Forge** – the shared meta-framework that links all Worlds’ task boards.  
   The Forge handles cross-World federation, coordination, collaboration, standards governance, arbitration of edge-cases, and even friendly leaderboard-style competition so that lessons learned in one World compound for all.
 
@@ -122,10 +121,10 @@ Together these layers let us innovate rapidly at the edge while safeguarding int
 | Directive | Guard-Rail |
 |-----------|------------|
 | **AI Guide** instantly turns a plain-language need into a quest, auto-splitting sub-tasks by learning from past community patterns. | Override or edit in two taps; no hostage flows. |
-| **90-Second WOW** – land, post quest, invite recipient in < 90 s. | We time every flow and shave steps until it hurts. |
-| **Zero-Instruction UI** – must pass the “newbie test”; icons + plain labels explain themselves. | Visual / haptic response < 100 ms; no wall-of-text tutorials. |
-| **Mobile- & Accessibility-First** – thumb-reachable, screen-reader friendly, low-bandwidth tolerant. | WCAG AA issues fixed before launch; real-world testers sign off. |
-| **Human-Tone Copy** – verbs, not jargon. | Copy review is part of every PR; text slop rejected at CI. |
+| **Quick Wow** – land, quest, engage in < 90 s. | We time every flow and shave steps until it effective. |
+| **Zero-Instruction UI** – must pass the “newbie test”; clear icons + plain labels explain themselves. | Visual / haptic response < 100 ms; no wall-of-text tutorials. |
+| **Mobile- & Accessibility-First** – easily-reachable, extensible, low-bandwidth tolerant. | Reasonable accessiblity issues fixed before launch; real-world testers sign off. |
+| **Human-Tone Copy** – verbs, not jargon. | Copy review is part of every PR; text slop rejected--own your work. |
 | **World-Level Themes** – each World owns its look within Forge-standardised protocols and safety rails. | Core UX remains recognizable/referencable so users can roam between Worlds without friction. |
 
 ---
