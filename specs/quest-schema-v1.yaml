@@ -1,0 +1,36 @@
+# Quest Schema Draft v1
+# Captures the dual-attestation model for CivicForge
+# Fields include basic and exceptional completion criteria, privacy settings,
+# and metadata necessary for minimal viable operation.
+
+quest_id: uuid
+world: string # identifier for the community or world
+creator_id: uuid # user who created the quest
+recipient_id: uuid # user who will attest completion
+created_at: datetime
+updated_at: datetime
+status: string # open | in_progress | completed | verified
+privacy: string # public | private
+
+title: string
+summary: string
+basic_completion: string # what counts as done
+exceptional_completion: string # stretch goal / extra credit
+
+due_date: date
+location: string # optional
+attachments:
+  - url: string
+    description: string
+
+attestation:
+  actor_confirmed_at: datetime # when creator claims completion
+  recipient_confirmed_at: datetime # when recipient verifies
+  exceptional: boolean # did it meet exceptional criteria?
+  notes: string
+
+metadata:
+  tags:
+    - string
+  ai_generated: boolean # true if created via AI copilot
+  version: 1
