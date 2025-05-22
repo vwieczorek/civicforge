@@ -49,7 +49,7 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
 
 ## 5. Next Steps
 1. **(done)** Define database schema and models for Users, Quests, Verifications, and Experience ledger. See `board_mvp/models.py`.
-2. Implement the Quest state machine and API endpoints.
+2. **(done)** Implement the Quest state machine and API endpoints.
 3. Build the basic web UI or CLI for creating and tracking Quests.
 4. Add Experience accounting and weekly decay job.
 5. Implement reputation updates tied to verifications.
