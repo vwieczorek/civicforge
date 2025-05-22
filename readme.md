@@ -1,5 +1,9 @@
 # CivicForge: Turning Good Intentions Into Real Impact
 
+> **TL;DR**  
+> **Boards** turn local ideas into tasks. **The Forge** links boards for bigger impact.  
+> Earn **Impact Points** when your work is verified—reputation that follows you anywhere on the platform.
+
 ## The Problem We All Recognize
 
 Picture this: You're scrolling through social media, seeing problems in your community that could be solved. The vacant lot that could become a garden. The seniors who need help with technology. The local stream that needs cleaning. You want to help, but where do you start? How do you find others who share your concern? How do you organize effectively? How do you ensure your efforts create lasting change?
@@ -22,7 +26,7 @@ Think of it as the missing infrastructure for community action—combining the b
 
 ---
 
-## How It Works: The Three-Layer Architecture
+## How It Works: The Two-Layer Architecture
 
 ### Layer 1: Boards - Where Communities Come Alive
 
@@ -31,12 +35,12 @@ Think of it as the missing infrastructure for community action—combining the b
 Imagine your neighborhood association, environmental group, or local business district having a dedicated digital space that's completely customized to your needs and values. This isn't a generic social media group—it's a purpose-built action center.
 
 **Key Features:**
-- **Quest Lifecycle Management**: Ideas become action through a structured process
+- **Task Lifecycle Management**: Ideas become action through a structured process
 - **Customizable Identity**: Each Board reflects its community's unique character and priorities
 - **Local Governance**: Communities set their own rules within ethical guardrails
 
 **Example in Action:**
-*The Riverside Neighborhood Board identifies that their community garden needs regular maintenance. Sarah creates a "Quest" detailing what needs to be done. Mike claims it and completes the weeding. Before it's marked complete, both Sarah and the garden coordinator verify the work was done well. Mike earns Experience points, the garden stays healthy, and the community has a public record of positive action.*
+*The Riverside Neighborhood Board identifies that their community garden needs regular maintenance. Sarah creates a task detailing what needs to be done. Mike claims it and completes the weeding. Before it's marked complete, both Sarah and the garden coordinator verify the work was done well. Mike earns Experience points, the garden stays healthy, and the community has a public record of positive action.*
 
 ### Layer 2: The Forge - Connecting Communities at Scale
 
@@ -55,18 +59,23 @@ Individual communities are powerful, but connected communities can tackle bigger
 **Verified Identity (Uglobal)**: Real people, genuine trust
 - *Not surveillance, but verification—ensuring accountable participation*
 
-### Layer 3: Experience Economy - Rewarding Real Impact
+## Experience Points (XP) – Reputation That Travels
 
-**Experience points aren't just gamification—they're social capital that fuels community action.**
+Complete tasks, verify others’ work, or publish reusable playbooks and you earn XP.  
+These points are more than gamification—they unlock platform privileges and signal trust across every board.
 
-When you complete projects, verify others' work accurately, or create valuable opportunities for others, you earn Experience. This isn't just a score—it's functional currency within the platform.
+| What you do | Points earn-rate | Why it matters |
+|-------------|-----------------|----------------|
+| Promot a task | Community up-votes | Highlights meaningful needs |
+| Complete the work | Based on effort | Rewards real work |
+| Verify accurately | A share of the task's points | Incentivizes honest attestation |
+| Publish templates | Ongoing trickle as others reuse | Promotes knowledge-sharing |
 
-**What Experience Enables:**
-- **Quest Creation**: Proposing new projects requires a small Experience investment (preventing spam)
-- **Visibility Boosting**: Important projects can be highlighted using Experience
-- **Cross-Board Collaboration**: Your reputation travels with you across communities
+**Uses for Experience Points (XP)**
 
-**Impact-Weighted Rewards**: Complex, high-impact projects earn more Experience than simple tasks, incentivizing meaningful contribution over busy work.
+- **Post new tasks** (anti-spam entry fee)  
+- **Boost visibility** of urgent initiatives  
+- **Carry reputation** when you join or found other boards
 
 ---
 
@@ -74,7 +83,7 @@ When you complete projects, verify others' work accurately, or create valuable o
 
 **The heart of CivicForge is its verification system—what we call "Dual Attestation."**
 
-Unlike other platforms where you simply claim credit for work, CivicForge requires independent verification. When someone completes a Quest, at least one other person must confirm the work was done satisfactorily.
+Unlike other platforms where you simply claim credit for work, CivicForge requires independent verification. When someone completes a task, at least one other person must confirm the work was done satisfactorily.
 
 **Why This Matters:**
 - **Builds Trust**: Communities develop confidence in each other through verified action
@@ -88,10 +97,12 @@ Unlike other platforms where you simply claim credit for work, CivicForge requir
 
 We've seen how online platforms can be gamed, manipulated, or overwhelmed by bad actors. CivicForge is designed with protections from day one:
 
-**Preventing Quest Spam**: Experience requirements and community filtering
-**Avoiding Collusion**: Random verifier selection and transparent records
-**Handling Disputes**: Clear escalation process from local to platform-wide resolution
-**Measuring Real Impact**: Analytics that focus on community benefit, not just activity
+- **Stop Spam** · Impact Point stake & community filters  
+- **Block Collusion** · Random verifier assignment + public logs  
+- **Resolve Disputes** · Clear escalation path (board → federation)  
+- **Protect Privacy** · Personal data stays local unless you opt-in  
+- **Mobile-First UX** · Simple task posting & verification  
+- **Sustainable Model** · Open-source core; premium hosting
 
 ---
 
@@ -127,8 +138,8 @@ CivicForge is designed to be an **adaptive system**—one that learns and improv
 ### Tracking Development on the MVP Board
 
 The repository now includes a helper script to seed the MVP Board with initial
-project-tracking quests. Run `python -m board_mvp.seed_tasks` to create sample
-users and quests from `mvp_board_plan.md`. After running the script, open the
+project-tracking tasks. Run `python -m board_mvp.seed_tasks` to create sample
+users and tasks from `mvp_board_plan.md`. After running the script, open the
 web interface (see `board_mvp/README.md`) to manage development work directly on
 the Board.
 
