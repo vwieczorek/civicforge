@@ -70,8 +70,9 @@ The current codebase does not yet provide these stubs. Planned tasks include:
      handling.
 7. **(done)** Write integration tests for the quest lifecycle.
    * Tests now cover the web UI routes as well.
-8. Move development tracking and CivicForge feedback onto the first Board once the basic web UI is usable.
-   * Next agent: begin migrating project tracking to the Board.
+8. **(in progress)** Move development tracking and CivicForge feedback onto the first Board once the basic web UI is usable.
+   * A helper script `board_mvp/seed_tasks.py` seeds the Board with initial quests for upcoming work.
+   * Next agent: continue adding tasks through the web UI and reference them in pull request descriptions.
 9. Document and implement the Forge API stubs described above.
 
 ### Potential Issues

@@ -124,6 +124,14 @@ Most importantly, imagine seeing **your neighbors becoming more engaged, more co
 
 CivicForge is designed to be an **adaptive system**—one that learns and improves based on real community feedback and measurable impact. The platform includes robust analytics (StatsBoard) to track not just activity, but actual positive community outcomes.
 
+### Tracking Development on the MVP Board
+
+The repository now includes a helper script to seed the MVP Board with initial
+project-tracking quests. Run `python -m board_mvp.seed_tasks` to create sample
+users and quests from `mvp_board_plan.md`. After running the script, open the
+web interface (see `board_mvp/README.md`) to manage development work directly on
+the Board.
+
 **This isn't just about building better software—it's about building better communities.** Communities where good intentions become organized action, where individual effort contributes to collective impact, and where digital tools serve human flourishing.
 
 ---
