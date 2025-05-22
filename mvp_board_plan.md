@@ -56,11 +56,12 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
    * Next agent: expand tests around decay scheduling and persistence.
 5. **(done)** Implement reputation updates tied to verifications. Reputation now
    increments for performers and verifiers in `verify_quest`.
-6. Build a minimal web UI for creating and tracking Quests so nontechnical users
-   can interact with the Board.
-   * Next agent: scaffold a simple FastAPI template or lightweight frontend to
-     list and create quests.
-7. Write integration tests for the quest lifecycle.
+6. **(done)** Build a minimal web UI for creating and tracking Quests so
+   nontechnical users can interact with the Board. See `board_mvp/web.py`.
+   * Next agent: extend the web UI with quest claiming and verification forms and
+     add basic error handling.
+7. **(done)** Write integration tests for the quest lifecycle.
+   * Next agent: add tests covering the web UI routes.
 8. Move development tracking and CivicForge feedback onto the first Board as soon as possible.
 9. Document the stubbed Forge APIs for future expansion.
 
@@ -71,5 +72,7 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
   reliability model.
 - Weekly decay currently requires manual invocation via the CLI; scheduling
   should be automated in production.
+- Initial web UI lacks authentication or CSRF protection; any user can submit
+  forms directly.
 
 This MVP will demonstrate the core mechanics—verified action and Experience‑based rewards—while leaving room for the federation and advanced governance envisioned for CivicForge.

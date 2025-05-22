@@ -16,3 +16,14 @@ The schema defines tables for:
 - **experience_ledger** – experience point transactions
 
 These tables are a foundation for implementing the quest state machine and reputation system described in `mvp_board_plan.md`.
+
+## Running the API and Web UI
+
+To start the combined API and web interface:
+
+```bash
+uvicorn board_mvp.web:app --reload
+```
+
+This serves the API under `/api` and a very small HTML interface at `/` for listing
+and creating quests.
