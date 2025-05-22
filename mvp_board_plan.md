@@ -20,27 +20,35 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
 - Both performer and verifier attest as described in the dual‑attestation notes.
 
 ### 2.3 Verification & Reputation
-- Use a simple Bayesian or agreement model for dual attestation as recommended.
-- Each user accrues reputation for successful quest completions and accurate verifications.
-- Reputation feeds back into verifier selection and dispute resolution.
+The MVP implements a very small reputation system. Reputation increases when
+quests are verified and decreases on failed work. A more robust Bayesian or
+agreement model for dual attestation remains a future improvement.
+Reputation should ultimately feed back into verifier selection and dispute
+resolution.
 
 ### 2.4 Experience Point Economy
-- Define Experience rewards and decay rates in the Board configuration. math_model_guideance.md notes that rewards should scale with impact and can decay over time.
-- Users spend Experience to post new Quests and optionally boost visibility.
-- Track balances per user; implement decay via a scheduled job.
+Experience rewards and decay are implemented with fixed values in the code.
+Future work should move these into configurable settings so rewards scale with
+impact and decay can be tuned per Board. Users spend Experience to post new
+Quests and optionally boost visibility. Balances are tracked in an experience
+ledger and can be reduced by running the `run_decay` job.
 
 ### 2.5 Moderation & Disputes
-- Board‑level moderators handle disputes first.
-- Build an escalation hook for the Forge council but leave the logic stubbed.
+These features are not implemented yet. The intent is for Board‑level
+moderators to handle disputes first with a simple escalation hook to the Forge
+council. Implementation details remain a TODO.
 
 ### 2.6 Stats and Impact
-- Record metrics for quests completed, reputation changes, and Experience earned/spent.
-- Expose an endpoint to export stats for the planned Composite Community Impact Index.
+Stats tracking has not been implemented. The Board should eventually record
+metrics for quests completed, reputation changes, and Experience earned or
+spent. An endpoint to export these stats for the Composite Community Impact
+Index will be needed.
 
 ## 3. Forge Stubs
-- Placeholder service for verifying global identity (`Uglobal`). Returns a mock verification response.
-- Minimal API endpoints for registering Boards and for submitting feature proposals to the Forge registry (`Fregistry`). These just log the request.
-- Hooks for cross‑Board collaboration (`Xglobal`) left unimplemented but documented.
+The current codebase does not yet provide these stubs. Planned tasks include:
+- A placeholder service for verifying global identity (`Uglobal`) that simply returns a mock verification response.
+- Minimal API endpoints for registering Boards and for submitting feature proposals to the Forge registry (`Fregistry`). These should initially just log the request.
+- Documentation for cross‑Board collaboration hooks (`Xglobal`).
 
 ## 4. Architecture Notes
 - Build modular components with clear APIs so Boards can interoperate and evolve as the Forge grows.
@@ -62,8 +70,8 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
      add basic error handling.
 7. **(done)** Write integration tests for the quest lifecycle.
    * Next agent: add tests covering the web UI routes.
-8. Move development tracking and CivicForge feedback onto the first Board as soon as possible.
-9. Document the stubbed Forge APIs for future expansion.
+8. Move development tracking and CivicForge feedback onto the first Board once the basic web UI is usable.
+9. Document and implement the Forge API stubs described above.
 
 ### Potential Issues
 - SQLite connection is global and not thread-safe; FastAPI may need connection
@@ -76,3 +84,4 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
   forms directly.
 
 This MVP will demonstrate the core mechanics—verified action and Experience‑based rewards—while leaving room for the federation and advanced governance envisioned for CivicForge.
+
