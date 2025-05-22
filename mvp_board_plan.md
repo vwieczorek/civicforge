@@ -50,11 +50,15 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
 ## 5. Next Steps
 1. **(done)** Define database schema and models for Users, Quests, Verifications, and Experience ledger. See `board_mvp/models.py`.
 2. **(done)** Implement the Quest state machine and API endpoints.
-3. Build the basic web UI or CLI for creating and tracking Quests.
-4. Add Experience accounting and weekly decay job.
+3. **(done)** Build the basic CLI for creating and tracking Quests. See `board_mvp/cli.py`.
+4. **(done)** Add Experience accounting and weekly decay job. Experience rewards
+   are logged in `experience_ledger`, and `run_decay` reduces balances weekly.
+   * Next agent: expand tests around decay scheduling and persistence.
 5. Implement reputation updates tied to verifications.
-6. Write integration tests for the quest lifecycle.
-7. Move development tracking and CivicForge feedback onto the first Board as soon as possible.
-8. Document the stubbed Forge APIs for future expansion.
+6. Build a minimal web UI for creating and tracking Quests so nontechnical users
+   can interact with the Board.
+7. Write integration tests for the quest lifecycle.
+8. Move development tracking and CivicForge feedback onto the first Board as soon as possible.
+9. Document the stubbed Forge APIs for future expansion.
 
 This MVP will demonstrate the core mechanics—verified action and Experience‑based rewards—while leaving room for the federation and advanced governance envisioned for CivicForge.
