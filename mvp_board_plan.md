@@ -48,7 +48,7 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
 - Use a relational DB (SQLite in development) to store users, quests, Experience ledger, and board config.
 
 ## 5. Next Steps
-1. Define database schema and models for Users, Quests, Verifications, and Experience ledger.
+1. **(done)** Define database schema and models for Users, Quests, Verifications, and Experience ledger. See `board_mvp/models.py`.
 2. Implement the Quest state machine and API endpoints.
 3. Build the basic web UI or CLI for creating and tracking Quests.
 4. Add Experience accounting and weekly decay job.
