@@ -32,3 +32,20 @@ def test_quest_lifecycle(tmp_path):
     # verify quest
     quest = api.verify_quest(quest.id, api.VerificationRequest(verifier_id=alice.id, result="normal"))
     assert quest.status == api.QuestStatus.LOGGED_COMPLETED
+
+    # experience rewards
+    perf_xp = api.get_user_experience(bob.id)
+    ver_xp = api.get_user_experience(alice.id)
+    assert perf_xp == 10
+    assert ver_xp == 5
+
+
+def test_decay(tmp_path):
+    db_path = tmp_path / "decay.db"
+    api = load_api(db_path)
+
+    user = api.create_user(api.UserCreate(username="u", real_name="U", role="Org"))
+    api.add_experience(user.id, 10, "bonus")
+    assert api.get_user_experience(user.id) == 10
+    api.run_decay(amount=2)
+    assert api.get_user_experience(user.id) == 8

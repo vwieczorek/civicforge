@@ -15,6 +15,9 @@ app = FastAPI(title="CivicForge Board MVP")
 DB_PATH = os.environ.get("BOARD_DB_PATH", models.DB_PATH)
 conn = models.init_db(DB_PATH)
 
+# Weekly decay amount for experience points
+WEEKLY_DECAY = 1
+
 
 class UserCreate(BaseModel):
     username: str
@@ -49,6 +52,44 @@ class QuestStatus(str, Enum):
     LOGGED_COMPLETED = "S10_LOGGED_COMPLETED"
     LOGGED_FAILED = "S11_LOGGED_FAILED"
     CANCELLED = "S12_CANCELLED"
+
+
+def add_experience(user_id: int, amount: int, entry_type: str, quest_id: Optional[int] = None):
+    """Insert an experience ledger entry."""
+    cur = conn.cursor()
+    now = datetime.utcnow().isoformat()
+    cur.execute(
+        "INSERT INTO experience_ledger (user_id, amount, entry_type, quest_id, timestamp)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (user_id, amount, entry_type, quest_id, now),
+    )
+    conn.commit()
+
+
+def get_user_experience(user_id: int) -> int:
+    """Return total experience for a user."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COALESCE(SUM(amount), 0) FROM experience_ledger WHERE user_id=?",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    return row[0] if row else 0
+
+
+def run_decay(amount: int = WEEKLY_DECAY):
+    """Apply weekly decay to all users."""
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM users")
+    users = [row[0] for row in cur.fetchall()]
+    now = datetime.utcnow().isoformat()
+    for uid in users:
+        cur.execute(
+            "INSERT INTO experience_ledger (user_id, amount, entry_type, quest_id, timestamp)"
+            " VALUES (?, ?, 'decay', NULL, ?)",
+            (uid, -amount, now),
+        )
+    conn.commit()
 
 
 @app.post("/users", response_model=models.User)
@@ -220,6 +261,9 @@ def verify_quest(quest_id: int, req: VerificationRequest):
         final_status = QuestStatus.LOGGED_FAILED.value
     else:
         final_status = QuestStatus.LOGGED_COMPLETED.value
+        reward = 10 if req.result == "normal" else 20
+        add_experience(performer_id, reward, "quest_reward", quest_id)
+        add_experience(req.verifier_id, reward // 2, "verification_reward", quest_id)
     cur.execute(
         "UPDATE quests SET verifier_id=?, status=?, updated_at=? WHERE id=?",
         (req.verifier_id, final_status, now, quest_id),
