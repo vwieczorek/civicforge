@@ -4,11 +4,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 
-from board_mvp.tests import test_schema
+from board_mvp.tests import test_schema, test_api
 
 
 def run():
     test_schema.test_schema_creation(tmp_path=ROOT)
+    test_api.test_quest_lifecycle(tmp_path=ROOT)
     print('All tests passed.')
 
 
