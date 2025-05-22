@@ -15,6 +15,9 @@ def main():
 
     subparsers.add_parser("list-users", help="List all users")
 
+    p_view_user = subparsers.add_parser("view-user", help="View a user")
+    p_view_user.add_argument("user_id", type=int)
+
     p_create_quest = subparsers.add_parser("create-quest", help="Create a new quest")
     p_create_quest.add_argument("title")
     p_create_quest.add_argument("creator_id", type=int)
@@ -54,6 +57,8 @@ def main():
     elif args.command == "list-users":
         for u in api.list_users():
             print(u)
+    elif args.command == "view-user":
+        print(api.get_user_by_id(args.user_id))
     elif args.command == "create-quest":
         quest = api.create_quest(
             api.QuestCreate(

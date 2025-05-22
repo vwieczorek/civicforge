@@ -39,6 +39,12 @@ def test_quest_lifecycle(tmp_path):
     assert perf_xp == 10
     assert ver_xp == 5
 
+    # reputation updates
+    perf_rep = api.get_user_by_id(bob.id).reputation
+    ver_rep = api.get_user_by_id(alice.id).reputation
+    assert perf_rep == 1
+    assert ver_rep == 1
+
 
 def test_decay(tmp_path):
     db_path = tmp_path / "decay.db"

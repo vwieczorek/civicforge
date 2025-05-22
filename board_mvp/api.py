@@ -77,6 +77,37 @@ def get_user_experience(user_id: int) -> int:
     return row[0] if row else 0
 
 
+def add_reputation(user_id: int, amount: int):
+    """Adjust a user's reputation score."""
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET reputation = reputation + ? WHERE id=?",
+        (amount, user_id),
+    )
+    conn.commit()
+
+
+def get_user_by_id(user_id: int) -> models.User:
+    """Fetch a single user by id."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT id, username, real_name, verified, role, reputation, created_at FROM users WHERE id=?",
+        (user_id,),
+    )
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    return models.User(
+        id=row[0],
+        username=row[1],
+        real_name=row[2],
+        verified=bool(row[3]),
+        role=row[4],
+        reputation=row[5],
+        created_at=datetime.fromisoformat(row[6]),
+    )
+
+
 def run_decay(amount: int = WEEKLY_DECAY):
     """Apply weekly decay to all users."""
     cur = conn.cursor()
@@ -131,6 +162,11 @@ def list_users():
         )
         for row in rows
     ]
+
+
+@app.get("/users/{user_id}", response_model=models.User)
+def get_user(user_id: int):
+    return get_user_by_id(user_id)
 
 
 @app.post("/quests", response_model=models.Quest)
@@ -259,11 +295,15 @@ def verify_quest(quest_id: int, req: VerificationRequest):
     )
     if req.result == "failed":
         final_status = QuestStatus.LOGGED_FAILED.value
+        add_reputation(performer_id, -1)
     else:
         final_status = QuestStatus.LOGGED_COMPLETED.value
         reward = 10 if req.result == "normal" else 20
         add_experience(performer_id, reward, "quest_reward", quest_id)
         add_experience(req.verifier_id, reward // 2, "verification_reward", quest_id)
+        rep_gain = 1 if req.result == "normal" else 2
+        add_reputation(performer_id, rep_gain)
+        add_reputation(req.verifier_id, rep_gain // 2 or 1)
     cur.execute(
         "UPDATE quests SET verifier_id=?, status=?, updated_at=? WHERE id=?",
         (req.verifier_id, final_status, now, quest_id),

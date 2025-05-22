@@ -54,11 +54,22 @@ Implement the S0–S12 quest state machine described in `math_model_guideance.md
 4. **(done)** Add Experience accounting and weekly decay job. Experience rewards
    are logged in `experience_ledger`, and `run_decay` reduces balances weekly.
    * Next agent: expand tests around decay scheduling and persistence.
-5. Implement reputation updates tied to verifications.
+5. **(done)** Implement reputation updates tied to verifications. Reputation now
+   increments for performers and verifiers in `verify_quest`.
 6. Build a minimal web UI for creating and tracking Quests so nontechnical users
    can interact with the Board.
+   * Next agent: scaffold a simple FastAPI template or lightweight frontend to
+     list and create quests.
 7. Write integration tests for the quest lifecycle.
 8. Move development tracking and CivicForge feedback onto the first Board as soon as possible.
 9. Document the stubbed Forge APIs for future expansion.
+
+### Potential Issues
+- SQLite connection is global and not thread-safe; FastAPI may need connection
+  pooling if run with multiple workers.
+- Reputation adjustments are simplistic and should evolve into a more robust
+  reliability model.
+- Weekly decay currently requires manual invocation via the CLI; scheduling
+  should be automated in production.
 
 This MVP will demonstrate the core mechanics—verified action and Experience‑based rewards—while leaving room for the federation and advanced governance envisioned for CivicForge.
