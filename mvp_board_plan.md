@@ -61,16 +61,17 @@ The current codebase does not yet provide these stubs. Planned tasks include:
 3. **(done)** Build the basic CLI for creating and tracking Quests. See `board_mvp/cli.py`.
 4. **(done)** Add Experience accounting and weekly decay job. Experience rewards
    are logged in `experience_ledger`, and `run_decay` reduces balances weekly.
-   * Next agent: expand tests around decay scheduling and persistence.
+   * Tests around decay scheduling and persistence have been added.
 5. **(done)** Implement reputation updates tied to verifications. Reputation now
    increments for performers and verifiers in `verify_quest`.
 6. **(done)** Build a minimal web UI for creating and tracking Quests so
    nontechnical users can interact with the Board. See `board_mvp/web.py`.
-   * Next agent: extend the web UI with quest claiming and verification forms and
-     add basic error handling.
+   * Web UI now includes quest claiming and verification forms with basic error
+     handling.
 7. **(done)** Write integration tests for the quest lifecycle.
-   * Next agent: add tests covering the web UI routes.
+   * Tests now cover the web UI routes as well.
 8. Move development tracking and CivicForge feedback onto the first Board once the basic web UI is usable.
+   * Next agent: begin migrating project tracking to the Board.
 9. Document and implement the Forge API stubs described above.
 
 ### Potential Issues
