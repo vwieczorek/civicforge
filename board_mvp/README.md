@@ -27,3 +27,9 @@ uvicorn board_mvp.web:app --reload
 
 This serves the API under `/api` and a very small HTML interface at `/` for listing
 and creating quests.
+
+### Seeding Initial Project Quests
+
+Run `python -m board_mvp.seed_tasks` to populate the board with a couple of
+starter users and quests drawn from `mvp_board_plan.md`. This is the first step
+toward tracking CivicForge development directly within the Board.
