@@ -2,7 +2,7 @@
 
 > **TL;DR**  
 > **Boards** turn local ideas into tasks. **The Forge** links boards for bigger impact.  
-> Earn **Impact Points** when your work is verified—reputation that follows you anywhere on the platform.
+> Earn **Experience Points** when your work is verified—reputation that follows you anywhere on the platform.
 
 ## The Problem We All Recognize
 
