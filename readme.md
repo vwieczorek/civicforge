@@ -6,25 +6,81 @@
 
 ## 🚀 Quick Start (For Developers)
 
+**LATEST UPDATE (May 24, 2025): Production-ready with PostgreSQL support and Docker deployment!**
+
+### 🐳 Recommended: Docker (Easiest)
 ```bash
-# Install dependencies
-pip install fastapi uvicorn python-multipart
+# Clone and start everything
+git clone <repo-url>
+cd civicforge
 
-# Set up database
-export BOARD_DB_PATH=/path/to/civicforge/board.db
-python -m src.board_mvp.migrations
+# Start the full stack
+docker-compose up -d
 
-# Start the server
-uvicorn src.board_mvp.web:app --reload
+# Access the application
+open http://localhost:8000
 
-# In another terminal, seed with test data
-python -m src.board_mvp.seed_tasks
-
-# Open http://localhost:8000
-# Login with: admin/admin123 or dev/dev123
+# Default login credentials:
+# - admin/admin123 (Organizer with 20 XP)
+# - dev/dev123 (Participant with 0 XP)
 ```
 
-**Current Status**: Authentication system implemented! See `CURRENT_STATUS.md` and `HANDOFF_NOTES.md` for details.
+### 🔧 Local Development Options
+
+#### Option 1: Docker + Local Development
+```bash
+# Start PostgreSQL only
+docker-compose up postgres -d
+
+# Set up local environment
+export DATABASE_URL=postgresql://civicforge:civicforge_dev_password@localhost:5432/civicforge_db
+export CIVICFORGE_SECRET_KEY=your-secret-key-here-minimum-32-characters
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run migrations and start server
+python -m src.board_mvp.migrations_pg
+uvicorn src.board_mvp.web:app --reload --host 0.0.0.0
+```
+
+#### Option 2: SQLite (Quick Testing)
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set up environment
+export CIVICFORGE_SECRET_KEY=your-secret-key-here-minimum-32-characters
+export BOARD_DB_PATH=/path/to/civicforge/board.db
+
+# Run migrations and start server
+python -m src.board_mvp.migrations_pg
+uvicorn src.board_mvp.web:app --reload
+
+# Seed with test data
+python -m src.board_mvp.seed_tasks
+```
+
+## 📚 Documentation
+
+- **CURRENT_STATUS.md** - What's working now and immediate next steps
+- **HANDOFF_TO_NEXT_AGENT.md** - Comprehensive handoff for next developer
+- **TESTING_GUIDE.md** - How to test both SQLite and PostgreSQL
+- **deploy/aws/** - Production deployment guides
+- **DEVELOPMENT_LOG.md** - Detailed session logs
+
+**Current Status**: Production-ready with Docker deployment! PostgreSQL backend, authentication system, and full quest lifecycle implemented. Ready for AWS deployment.
+
+## 🚀 Production Deployment
+
+### Current: Docker (Recommended)
+Use Docker for development and staging environments:
+```bash
+docker-compose up -d  # Full stack with PostgreSQL
+```
+
+### Next: AWS Production
+AWS deployment configuration is ready in `deploy/aws/`. Follow the infrastructure guide for production deployment with ECS and RDS.
 
 ## 📁 Project Structure
 

@@ -1,6 +1,6 @@
 import os
 import requests
-from . import api
+from .database import get_db
 
 """Seed the board database with initial users and quests for project tracking."""
 
@@ -10,9 +10,8 @@ API_BASE = "http://localhost:8000/api"
 
 def ensure_user(username: str, email: str, password: str, real_name: str, role: str) -> dict:
     """Create a user if it doesn't already exist, return user info and token."""
-    cur = api.get_conn().cursor()
-    cur.execute("SELECT id FROM users WHERE username=?", (username,))
-    row = cur.fetchone()
+    db = get_db()
+    row = db.fetchone("SELECT id FROM users WHERE username=?", (username,))
     
     if row:
         # User exists, try to login

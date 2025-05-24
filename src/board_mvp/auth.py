@@ -7,10 +7,11 @@ import hmac
 import secrets
 import json
 import base64
+import os
 
 # Simple JWT implementation (for MVP - consider using PyJWT in production)
-SECRET_KEY = "your-secret-key-change-this-in-production"  # TODO: Move to environment variable
-TOKEN_EXPIRY_HOURS = 24
+SECRET_KEY = os.environ.get('CIVICFORGE_SECRET_KEY', 'dev-secret-key-change-in-production')
+TOKEN_EXPIRY_HOURS = int(os.environ.get('TOKEN_EXPIRY_HOURS', '24'))
 
 
 def hash_password(password: str) -> str:

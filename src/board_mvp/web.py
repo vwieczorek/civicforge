@@ -4,8 +4,12 @@ from typing import Optional
 import requests
 
 from . import api
+from .database import init_db
 
 app = FastAPI(title="CivicForge Board Web UI")
+
+# Initialize the database
+init_db()
 
 # Mount the existing API under /api for convenience
 app.mount("/api", api.app)

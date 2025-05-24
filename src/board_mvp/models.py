@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 import sqlite3
+import os
 
 
-DB_PATH = "board.db"
+DB_PATH = os.environ.get("BOARD_DB_PATH", "board.db")
 
 
 @dataclass

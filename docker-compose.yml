@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: civicforge
+      POSTGRES_PASSWORD: civicforge_dev_password
+      POSTGRES_DB: civicforge_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U civicforge -d civicforge_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://civicforge:civicforge_dev_password@postgres:5432/civicforge_db
+      CIVICFORGE_SECRET_KEY: dev-secret-key-change-in-production
+      TOKEN_EXPIRY_HOURS: 24
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src:ro
+    command: >
+      sh -c "python -m src.board_mvp.migrations_pg &&
+             uvicorn src.board_mvp.web:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:

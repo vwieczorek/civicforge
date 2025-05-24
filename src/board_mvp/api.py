@@ -9,27 +9,12 @@ from pydantic import BaseModel
 import os
 from . import models
 from . import auth
+from .database import get_db, Database, init_db
 
 app = FastAPI(title="CivicForge Board MVP")
 
-# Initialize database when the module is imported. The path can be overridden
-# with the ``BOARD_DB_PATH`` environment variable for testing purposes.
-DB_PATH = os.environ.get("BOARD_DB_PATH", models.DB_PATH)
-
-# Create a new connection for each thread
-import threading
-_thread_local = threading.local()
-
-def get_conn():
-    if not hasattr(_thread_local, 'conn'):
-        _thread_local.conn = models.init_db(DB_PATH)
-    return _thread_local.conn
-
-# For backward compatibility
-conn = get_conn()
-
-# Initialize the database structure on first import
-models.init_db(DB_PATH)
+# Initialize the database
+init_db()
 
 # Weekly decay amount for experience points
 WEEKLY_DECAY = 1
@@ -86,71 +71,75 @@ class QuestStatus(str, Enum):
 
 def add_experience(user_id: int, amount: int, entry_type: str, quest_id: Optional[int] = None):
     """Insert an experience ledger entry."""
-    cur = get_conn().cursor()
+    db = get_db()
     now = datetime.utcnow().isoformat()
-    cur.execute(
+    db.execute(
         "INSERT INTO experience_ledger (user_id, amount, entry_type, quest_id, timestamp)"
         " VALUES (?, ?, ?, ?, ?)",
         (user_id, amount, entry_type, quest_id, now),
     )
-    get_conn().commit()
+    db.commit()
 
 
 def get_user_experience(user_id: int) -> int:
     """Return total experience for a user."""
-    cur = get_conn().cursor()
-    cur.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM experience_ledger WHERE user_id=?",
+    db = get_db()
+    result = db.fetchone(
+        "SELECT COALESCE(SUM(amount), 0) as total FROM experience_ledger WHERE user_id=?",
         (user_id,),
     )
-    row = cur.fetchone()
-    return row[0] if row else 0
+    return result['total'] if result else 0
 
 
 def add_reputation(user_id: int, amount: int):
     """Adjust a user's reputation score."""
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    db.execute(
         "UPDATE users SET reputation = reputation + ? WHERE id=?",
         (amount, user_id),
     )
-    get_conn().commit()
+    db.commit()
 
 
 def get_user_by_id(user_id: int) -> models.User:
     """Fetch a single user by id."""
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    row = db.fetchone(
         "SELECT id, username, real_name, verified, role, reputation, created_at FROM users WHERE id=?",
         (user_id,),
     )
-    row = cur.fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="user not found")
     return models.User(
-        id=row[0],
-        username=row[1],
-        real_name=row[2],
-        verified=bool(row[3]),
-        role=row[4],
-        reputation=row[5],
-        created_at=datetime.fromisoformat(row[6]),
+        id=row['id'],
+        username=row['username'],
+        real_name=row['real_name'],
+        verified=bool(row['verified']),
+        role=row['role'],
+        reputation=row['reputation'],
+        created_at=datetime.fromisoformat(row['created_at']),
     )
 
 
 def run_decay(amount: int = WEEKLY_DECAY):
     """Apply weekly decay to all users."""
-    cur = get_conn().cursor()
-    cur.execute("SELECT id FROM users")
-    users = [row[0] for row in cur.fetchall()]
+    db = get_db()
+    users = db.fetchall("SELECT id FROM users")
     now = datetime.utcnow().isoformat()
-    for uid in users:
-        cur.execute(
+    
+    # Prepare batch insert data
+    decay_entries = [
+        (uid['id'], -amount, 'decay', None, now)
+        for uid in users
+    ]
+    
+    if decay_entries:
+        db.executemany(
             "INSERT INTO experience_ledger (user_id, amount, entry_type, quest_id, timestamp)"
-            " VALUES (?, ?, 'decay', NULL, ?)",
-            (uid, -amount, now),
+            " VALUES (?, ?, ?, ?, ?)",
+            decay_entries
         )
-    get_conn().commit()
+        db.commit()
 
 
 # Security dependency
@@ -168,29 +157,29 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 @app.post("/auth/register", response_model=TokenResponse)
 def register(user: UserRegister):
     """Register a new user with email and password."""
-    cur = get_conn().cursor()
+    db = get_db()
     
     # Check if username already exists
-    cur.execute("SELECT id FROM users WHERE username=?", (user.username,))
-    if cur.fetchone():
+    existing = db.fetchone("SELECT id FROM users WHERE username=?", (user.username,))
+    if existing:
         raise HTTPException(status_code=400, detail="Username already exists")
     
     # Check if email already exists
-    cur.execute("SELECT id FROM users WHERE email=?", (user.email,))
-    if cur.fetchone():
+    existing = db.fetchone("SELECT id FROM users WHERE email=?", (user.email,))
+    if existing:
         raise HTTPException(status_code=400, detail="Email already exists")
     
     # Hash password
     password_hash = auth.hash_password(user.password)
     
     # Create user
-    cur.execute(
+    db.execute(
         "INSERT INTO users (username, email, password_hash, real_name, verified, role, reputation, created_at)"
-        " VALUES (?, ?, ?, ?, 0, ?, 0, ?)",
-        (user.username, user.email, password_hash, user.real_name, user.role, datetime.utcnow().isoformat()),
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (user.username, user.email, password_hash, user.real_name, False, user.role, 0, datetime.utcnow().isoformat()),
     )
-    get_conn().commit()
-    user_id = cur.lastrowid
+    db.commit()
+    user_id = db.adapter.lastrowid
     
     # Grant initial experience points
     if user.role == "Organizer":
@@ -204,18 +193,19 @@ def register(user: UserRegister):
 @app.post("/auth/login", response_model=TokenResponse)
 def login(credentials: UserLogin):
     """Login with username and password."""
-    cur = get_conn().cursor()
+    db = get_db()
     
     # Get user by username
-    cur.execute(
+    row = db.fetchone(
         "SELECT id, username, password_hash FROM users WHERE username=?",
         (credentials.username,)
     )
-    row = cur.fetchone()
     if not row:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     
-    user_id, username, password_hash = row
+    user_id = row['id']
+    username = row['username']
+    password_hash = row['password_hash']
     
     # Verify password
     if not auth.verify_password(credentials.password, password_hash):
@@ -228,14 +218,14 @@ def login(credentials: UserLogin):
 
 @app.post("/users", response_model=models.User)
 def create_user(user: UserCreate):
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    db.execute(
         "INSERT INTO users (username, real_name, verified, role, reputation, created_at)"
-        " VALUES (?, ?, 0, ?, 0, ?)",
-        (user.username, user.real_name, user.role, datetime.utcnow().isoformat()),
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (user.username, user.real_name, False, user.role, 0, datetime.utcnow().isoformat()),
     )
-    get_conn().commit()
-    user_id = cur.lastrowid
+    db.commit()
+    user_id = db.adapter.lastrowid
     return models.User(
         id=user_id,
         username=user.username,
@@ -248,20 +238,19 @@ def create_user(user: UserCreate):
 
 @app.get("/users", response_model=List[models.User])
 def list_users():
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    rows = db.fetchall(
         "SELECT id, username, real_name, verified, role, reputation, created_at FROM users"
     )
-    rows = cur.fetchall()
     return [
         models.User(
-            id=row[0],
-            username=row[1],
-            real_name=row[2],
-            verified=bool(row[3]),
-            role=row[4],
-            reputation=row[5],
-            created_at=datetime.fromisoformat(row[6]),
+            id=row['id'],
+            username=row['username'],
+            real_name=row['real_name'],
+            verified=bool(row['verified']),
+            role=row['role'],
+            reputation=row['reputation'],
+            created_at=datetime.fromisoformat(row['created_at']),
         )
         for row in rows
     ]
@@ -289,8 +278,8 @@ def create_quest(quest: QuestCreate, current_user_id: int = Depends(get_current_
         )
 
     now = datetime.utcnow().isoformat()
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    db.execute(
         "INSERT INTO quests (title, description, reward, creator_id, status, category, created_at, updated_at)"
         " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
@@ -304,8 +293,8 @@ def create_quest(quest: QuestCreate, current_user_id: int = Depends(get_current_
             now,
         ),
     )
-    get_conn().commit()
-    quest_id = cur.lastrowid
+    db.commit()
+    quest_id = db.adapter.lastrowid
     
     # Deduct experience points for quest creation
     add_experience(current_user_id, -QUEST_CREATION_COST, "quest_creation", quest_id)
@@ -315,145 +304,147 @@ def create_quest(quest: QuestCreate, current_user_id: int = Depends(get_current_
 
 @app.post("/quests/{quest_id}/claim", response_model=models.Quest)
 def claim_quest(quest_id: int, current_user_id: int = Depends(get_current_user)):
-    cur = get_conn().cursor()
-    cur.execute("SELECT status FROM quests WHERE id=?", (quest_id,))
-    row = cur.fetchone()
+    db = get_db()
+    row = db.fetchone("SELECT status FROM quests WHERE id=?", (quest_id,))
     if row is None:
         raise HTTPException(status_code=404, detail="quest not found")
-    status = row[0]
+    status = row['status']
     if status != QuestStatus.OPEN.value:
         raise HTTPException(status_code=400, detail="quest not open")
 
     now = datetime.utcnow().isoformat()
-    cur.execute(
+    db.execute(
         "UPDATE quests SET performer_id=?, status=?, updated_at=? WHERE id=?",
         (current_user_id, QuestStatus.CLAIMED.value, now, quest_id),
     )
-    get_conn().commit()
+    db.commit()
     return get_quest_by_id(quest_id)
 
 
 def get_quest_by_id(quest_id: int) -> models.Quest:
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    row = db.fetchone(
         "SELECT id, title, description, reward, creator_id, performer_id, verifier_id, status, created_at, updated_at, category, visibility, boost_level FROM quests WHERE id=?",
         (quest_id,),
     )
-    row = cur.fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="quest not found")
     return models.Quest(
-        id=row[0],
-        title=row[1],
-        description=row[2],
-        reward=row[3],
-        creator_id=row[4],
-        performer_id=row[5],
-        verifier_id=row[6],
-        status=row[7],
-        created_at=datetime.fromisoformat(row[8]),
-        updated_at=datetime.fromisoformat(row[9]),
-        category=row[10],
-        visibility=row[11],
-        boost_level=row[12],
+        id=row['id'],
+        title=row['title'],
+        description=row['description'],
+        reward=row['reward'],
+        creator_id=row['creator_id'],
+        performer_id=row['performer_id'],
+        verifier_id=row['verifier_id'],
+        status=row['status'],
+        created_at=datetime.fromisoformat(row['created_at']),
+        updated_at=datetime.fromisoformat(row['updated_at']),
+        category=row['category'],
+        visibility=row['visibility'],
+        boost_level=row['boost_level'],
     )
 
 
 @app.post("/quests/{quest_id}/submit", response_model=models.Quest)
 def submit_work(quest_id: int, current_user_id: int = Depends(get_current_user)):
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    row = db.fetchone(
         "SELECT performer_id, status FROM quests WHERE id=?",
         (quest_id,),
     )
-    row = cur.fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="quest not found")
-    performer_id, status = row
+    performer_id = row['performer_id']
+    status = row['status']
     if performer_id != current_user_id:
         raise HTTPException(status_code=400, detail="not quest performer")
     if status != QuestStatus.CLAIMED.value:
         raise HTTPException(status_code=400, detail="invalid state")
     now = datetime.utcnow().isoformat()
-    cur.execute(
+    db.execute(
         "UPDATE quests SET status=?, updated_at=? WHERE id=?",
         (QuestStatus.WORK_SUBMITTED.value, now, quest_id),
     )
-    get_conn().commit()
+    db.commit()
     return get_quest_by_id(quest_id)
 
 
 @app.post("/quests/{quest_id}/verify", response_model=models.Quest)
 def verify_quest(quest_id: int, req: VerificationRequest, current_user_id: int = Depends(get_current_user)):
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    row = db.fetchone(
         "SELECT performer_id, status FROM quests WHERE id=?",
         (quest_id,),
     )
-    row = cur.fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="quest not found")
-    performer_id, status = row
+    performer_id = row['performer_id']
+    status = row['status']
     if status != QuestStatus.WORK_SUBMITTED.value:
         raise HTTPException(status_code=400, detail="quest not ready for verification")
     if req.result not in {"normal", "exceptional", "failed"}:
         raise HTTPException(status_code=400, detail="invalid result")
 
     now = datetime.utcnow().isoformat()
-    cur.execute(
-        "INSERT INTO verifications (quest_id, verifier_id, performer_id, result, created_at)"
-        " VALUES (?, ?, ?, ?, ?)",
-        (quest_id, current_user_id, performer_id, req.result, now),
-    )
-    if req.result == "failed":
-        final_status = QuestStatus.LOGGED_FAILED.value
-        add_reputation(performer_id, -1)
-    else:
-        final_status = QuestStatus.LOGGED_COMPLETED.value
-        reward = 10 if req.result == "normal" else 20
-        add_experience(performer_id, reward, "quest_reward", quest_id)
-        add_experience(current_user_id, reward // 2, "verification_reward", quest_id)
-        rep_gain = 1 if req.result == "normal" else 2
-        add_reputation(performer_id, rep_gain)
-        add_reputation(current_user_id, rep_gain // 2 or 1)
-    cur.execute(
-        "UPDATE quests SET verifier_id=?, status=?, updated_at=? WHERE id=?",
-        (current_user_id, final_status, now, quest_id),
-    )
-    get_conn().commit()
+    
+    # Use transaction for verification process
+    with db.transaction():
+        db.execute(
+            "INSERT INTO verifications (quest_id, verifier_id, performer_id, result, created_at)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (quest_id, current_user_id, performer_id, req.result, now),
+        )
+        
+        if req.result == "failed":
+            final_status = QuestStatus.LOGGED_FAILED.value
+            add_reputation(performer_id, -1)
+        else:
+            final_status = QuestStatus.LOGGED_COMPLETED.value
+            reward = 10 if req.result == "normal" else 20
+            add_experience(performer_id, reward, "quest_reward", quest_id)
+            add_experience(current_user_id, reward // 2, "verification_reward", quest_id)
+            rep_gain = 1 if req.result == "normal" else 2
+            add_reputation(performer_id, rep_gain)
+            add_reputation(current_user_id, rep_gain // 2 or 1)
+        
+        db.execute(
+            "UPDATE quests SET verifier_id=?, status=?, updated_at=? WHERE id=?",
+            (current_user_id, final_status, now, quest_id),
+        )
+    
     return get_quest_by_id(quest_id)
 
 
 @app.get("/quests", response_model=List[models.Quest])
 def list_quests(category: Optional[str] = None):
-    cur = get_conn().cursor()
+    db = get_db()
     
     if category:
-        cur.execute(
+        rows = db.fetchall(
             "SELECT id, title, description, reward, creator_id, performer_id, verifier_id, status, created_at, updated_at, category, visibility, boost_level FROM quests WHERE category=? ORDER BY boost_level DESC, created_at DESC",
             (category,)
         )
     else:
-        cur.execute(
+        rows = db.fetchall(
             "SELECT id, title, description, reward, creator_id, performer_id, verifier_id, status, created_at, updated_at, category, visibility, boost_level FROM quests ORDER BY boost_level DESC, created_at DESC"
         )
     
-    rows = cur.fetchall()
     return [
         models.Quest(
-            id=row[0],
-            title=row[1],
-            description=row[2],
-            reward=row[3],
-            creator_id=row[4],
-            performer_id=row[5],
-            verifier_id=row[6],
-            status=row[7],
-            created_at=datetime.fromisoformat(row[8]),
-            updated_at=datetime.fromisoformat(row[9]),
-            category=row[10],
-            visibility=row[11],
-            boost_level=row[12],
+            id=row['id'],
+            title=row['title'],
+            description=row['description'],
+            reward=row['reward'],
+            creator_id=row['creator_id'],
+            performer_id=row['performer_id'],
+            verifier_id=row['verifier_id'],
+            status=row['status'],
+            created_at=datetime.fromisoformat(row['created_at']),
+            updated_at=datetime.fromisoformat(row['updated_at']),
+            category=row['category'],
+            visibility=row['visibility'],
+            boost_level=row['boost_level'],
         )
         for row in rows
     ]
@@ -468,9 +459,8 @@ def get_quest(quest_id: int):
 def get_user_experience_balance(user_id: int):
     """Get a user's current experience balance."""
     # Ensure user exists
-    cur = get_conn().cursor()
-    cur.execute("SELECT id FROM users WHERE id=?", (user_id,))
-    if cur.fetchone() is None:
+    db = get_db()
+    if not db.fetchone("SELECT id FROM users WHERE id=?", (user_id,)):
         raise HTTPException(status_code=404, detail="user not found")
     
     balance = get_user_experience(user_id)
@@ -495,12 +485,12 @@ def boost_quest(quest_id: int, current_user_id: int = Depends(get_current_user))
     add_experience(current_user_id, -QUEST_BOOST_COST, "quest_boost", quest_id)
     
     # Update quest boost_level
-    cur = get_conn().cursor()
-    cur.execute(
+    db = get_db()
+    db.execute(
         "UPDATE quests SET boost_level = boost_level + 1 WHERE id=?",
         (quest_id,)
     )
-    get_conn().commit()
+    db.commit()
     
     return {"message": "Quest boosted successfully", "cost": QUEST_BOOST_COST}
 
@@ -508,8 +498,8 @@ def boost_quest(quest_id: int, current_user_id: int = Depends(get_current_user))
 @app.get("/categories")
 def list_categories():
     """Get list of available quest categories with counts."""
-    cur = get_conn().cursor()
-    cur.execute("""
+    db = get_db()
+    rows = db.fetchall("""
         SELECT category, COUNT(*) as count 
         FROM quests 
         WHERE category IS NOT NULL 
@@ -518,8 +508,8 @@ def list_categories():
     """)
     
     categories = [
-        {"name": row[0], "count": row[1]}
-        for row in cur.fetchall()
+        {"name": row['category'], "count": row['count']}
+        for row in rows
     ]
     
     # Add predefined categories even if they have no quests yet
@@ -536,35 +526,35 @@ def list_categories():
 @app.get("/stats/board")
 def get_board_stats():
     """Get board-wide statistics."""
-    cur = get_conn().cursor()
+    db = get_db()
     
     # Total quests by status
-    cur.execute("""
+    status_rows = db.fetchall("""
         SELECT status, COUNT(*) as count 
         FROM quests 
         GROUP BY status
     """)
-    quests_by_status = {row[0]: row[1] for row in cur.fetchall()}
+    quests_by_status = {row['status']: row['count'] for row in status_rows}
     
     # Total users by role
-    cur.execute("""
+    role_rows = db.fetchall("""
         SELECT role, COUNT(*) as count 
         FROM users 
         GROUP BY role
     """)
-    users_by_role = {row[0]: row[1] for row in cur.fetchall()}
+    users_by_role = {row['role']: row['count'] for row in role_rows}
     
     # Total XP in circulation
-    cur.execute("SELECT COALESCE(SUM(amount), 0) FROM experience_ledger")
-    total_xp = cur.fetchone()[0]
+    xp_result = db.fetchone("SELECT COALESCE(SUM(amount), 0) as total FROM experience_ledger")
+    total_xp = xp_result['total'] if xp_result else 0
     
     # Active users (those who have earned or spent XP)
-    cur.execute("""
-        SELECT COUNT(DISTINCT user_id) 
+    active_result = db.fetchone("""
+        SELECT COUNT(DISTINCT user_id) as count 
         FROM experience_ledger 
         WHERE timestamp > datetime('now', '-7 days')
     """)
-    active_users_week = cur.fetchone()[0]
+    active_users_week = active_result['count'] if active_result else 0
     
     # Quest completion rate
     total_quests = sum(quests_by_status.values())
@@ -572,13 +562,13 @@ def get_board_stats():
     completion_rate = (completed_quests / total_quests * 100) if total_quests > 0 else 0
     
     # Category distribution
-    cur.execute("""
+    cat_rows = db.fetchall("""
         SELECT category, COUNT(*) as count 
         FROM quests 
         WHERE category IS NOT NULL 
         GROUP BY category
     """)
-    quests_by_category = {row[0]: row[1] for row in cur.fetchall()}
+    quests_by_category = {row['category']: row['count'] for row in cat_rows}
     
     return {
         "quests": {
@@ -604,28 +594,28 @@ def get_user_stats(user_id: int):
     # Ensure user exists
     user = get_user_by_id(user_id)
     
-    cur = get_conn().cursor()
+    db = get_db()
     
     # Quests created
-    cur.execute("SELECT COUNT(*) FROM quests WHERE creator_id=?", (user_id,))
-    quests_created = cur.fetchone()[0]
+    created_result = db.fetchone("SELECT COUNT(*) as count FROM quests WHERE creator_id=?", (user_id,))
+    quests_created = created_result['count'] if created_result else 0
     
     # Quests performed
-    cur.execute("SELECT COUNT(*) FROM quests WHERE performer_id=? AND status='S10_LOGGED_COMPLETED'", (user_id,))
-    quests_completed = cur.fetchone()[0]
+    completed_result = db.fetchone("SELECT COUNT(*) as count FROM quests WHERE performer_id=? AND status='S10_LOGGED_COMPLETED'", (user_id,))
+    quests_completed = completed_result['count'] if completed_result else 0
     
     # Quests verified
-    cur.execute("SELECT COUNT(*) FROM quests WHERE verifier_id=?", (user_id,))
-    quests_verified = cur.fetchone()[0]
+    verified_result = db.fetchone("SELECT COUNT(*) as count FROM quests WHERE verifier_id=?", (user_id,))
+    quests_verified = verified_result['count'] if verified_result else 0
     
     # Experience history
-    cur.execute("""
+    xp_rows = db.fetchall("""
         SELECT entry_type, SUM(amount) as total 
         FROM experience_ledger 
         WHERE user_id=? 
         GROUP BY entry_type
     """, (user_id,))
-    xp_by_type = {row[0]: row[1] for row in cur.fetchall()}
+    xp_by_type = {row['entry_type']: row['total'] for row in xp_rows}
     
     # Current balance
     current_xp = get_user_experience(user_id)
@@ -647,3 +637,18 @@ def get_user_stats(user_id: int):
             "by_type": xp_by_type
         }
     }
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring."""
+    try:
+        # Test database connection
+        db = get_db()
+        result = db.fetchone("SELECT 1 as health_check")
+        if result and result['health_check'] == 1:
+            return {"status": "healthy", "database": "connected"}
+        else:
+            raise HTTPException(status_code=503, detail="Database check failed")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Health check failed: {str(e)}")
