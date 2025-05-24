@@ -4,6 +4,39 @@
 > **Boards** turn local ideas into tasks. **The Forge** links boards for bigger impact.  
 > Earn **Experience Points** when your work is verified—reputation that follows you anywhere on the platform.
 
+## 📁 Project Structure
+
+```
+civicforge/
+├── docs/                    # All documentation
+│   ├── concept/            # Vision & product briefs
+│   │   └── product_brief.md
+│   ├── governance/         # Rules, norms & governance docs
+│   │   └── governance.md
+│   ├── research/           # Research & analysis
+│   │   └── claude_opus_4_deep_research.md
+│   └── technical/          # Technical specs & plans
+│       ├── math_model_guideance.md
+│       └── mvp_board_plan.md
+├── src/                    # Source code
+│   └── board_mvp/         # Board MVP implementation
+│       ├── models.py      # Database models
+│       ├── api.py         # FastAPI endpoints
+│       ├── web.py         # Web interface
+│       ├── cli.py         # Command-line interface
+│       └── tests/         # Test suite
+├── resources/              # Additional resources
+│   └── math_model_overview.html
+└── readme.md              # This file
+```
+
+### Quick Navigation
+
+- **New to CivicForge?** Start with `docs/concept/product_brief.md`
+- **Want to understand our values?** Read `docs/governance/governance.md`
+- **Technical implementation?** Check `docs/technical/mvp_board_plan.md`
+- **Current MVP code?** Look in `src/board_mvp/`
+
 ## The Problem We All Recognize
 
 Picture this: You're scrolling through social media, seeing problems in your community that could be solved. The vacant lot that could become a garden. The seniors who need help with technology. The local stream that needs cleaning. You want to help, but where do you start? How do you find others who share your concern? How do you organize effectively? How do you ensure your efforts create lasting change?
