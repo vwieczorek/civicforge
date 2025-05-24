@@ -1,5 +1,23 @@
-# First Board MVP Plan (Updated)
+# First Board MVP Plan (Updated May 24, 2025)
 *Based on `math_model_guidance.md` and current implementation status*
+
+## 🚀 Current Status for Next Developer
+
+### What's Working Now
+- ✅ **Full quest lifecycle** with XP economy
+- ✅ **Web UI** at http://localhost:8000 (run: `uvicorn src.board_mvp.web:app --reload`)
+- ✅ **Quest categories** with filtering
+- ✅ **Stats dashboard** showing board metrics
+- ✅ **XP spending** for quest creation (5 XP) and boosting (10 XP)
+- ✅ **Database migrations** script for schema updates
+
+### Next Priority: Authentication
+The system is functional but **NOT SECURE**. The next critical step is implementing basic authentication to protect the platform before any real usage.
+
+### Known Issues
+- ⚠️ SQLite threading fixed with thread-local connections
+- ⚠️ Deprecation warnings for datetime.utcnow() (non-critical)
+- ⚠️ No authentication - anyone can perform any action
 
 ## 1. Core Goals ✅
 - ✅ Deliver a working Board where users can create, claim, verify, and log Quests
@@ -39,22 +57,33 @@
 - CLI for all operations
 - Form-based interaction (no auth yet)
 
-### ❌ Not Yet Implemented
+### ✅ Recently Completed (May 24, 2025)
 
 #### 2.6 Experience Spending
-- Quest creation costs
-- Quest boosting mechanism
-- Experience-based privileges
+- ✅ Quest creation costs (5 XP)
+- ✅ Quest boosting mechanism (10 XP, increases boost_level)
+- ✅ XP balance checking and enforcement
+- ❌ Additional experience-based privileges
 
-#### 2.7 Moderation & Disputes
+#### 2.7 Quest Categorization
+- ✅ Category field added to quests
+- ✅ Categories: civic, environmental, social, educational, technical, general
+- ✅ Category filtering in UI and API
+- ✅ Category-based statistics
+
+#### 2.8 Stats and Impact
+- ✅ StatsBoard API endpoints (/api/stats/board, /api/stats/user/{id})
+- ✅ Board-wide metrics collection
+- ✅ Simple dashboard view at /stats
+- ❌ Composite Community Impact Index (CCII)
+- ❌ Export capability for analysis
+
+### ❌ Not Yet Implemented
+
+#### 2.9 Moderation & Disputes
 - Dispute resolution beyond states
 - Board-level moderation tools
 - Escalation to Forge council
-
-#### 2.8 Stats and Impact
-- StatsBoard metrics collection
-- Composite Community Impact Index (CCII)
-- Quest categorization and tagging
 
 #### 2.9 Forge Integration
 - Global identity verification (`U_global`)
@@ -72,39 +101,36 @@
    - [ ] Automate weekly decay with cron/CloudWatch
 
 2. **Start Using It**
-   - [ ] Run `seed_tasks.py` to populate initial quests
+   - [x] Run `seed_tasks.py` to populate initial quests ✅
+   - [x] Fixed SQLite threading issues for web deployment ✅
    - [ ] Create quests for remaining CivicForge work
    - [ ] Complete and verify at least 10 real tasks
    - [ ] Document pain points and UX issues
 
-3. **Basic Authentication**
+3. **Basic Authentication** ⚠️ HIGH PRIORITY - Next Step
    - [ ] Add email/password auth to web UI
    - [ ] Protect quest creation/claiming/verification
    - [ ] Add session management
    - [ ] Basic "forgot password" flow
 
-### Phase 2: Core Mechanics Completion (Weeks 3-6)
+### Phase 2: Core Mechanics Completion ✅ MOSTLY COMPLETE
 
-4. **Experience Point Spending**
-   ```python
-   # Add to quest creation:
-   QUEST_CREATION_COST = 5  # Experience points
-   QUEST_BOOST_COST = 10    # To pin/highlight
-   
-   # Check balance before allowing creation
-   # Deduct from experience_ledger
-   ```
+4. **Experience Point Spending** ✅ IMPLEMENTED
+   - [x] Quest creation costs 5 XP
+   - [x] Quest boosting costs 10 XP
+   - [x] Balance checking prevents overspending
+   - [x] Initial XP grants in seed script
 
-5. **Quest Categorization**
-   - [ ] Add `category` field to quests table
-   - [ ] Define initial categories (civic, environmental, social, educational)
-   - [ ] Add filtering by category in UI
-   - [ ] Track category-based stats
+5. **Quest Categorization** ✅ IMPLEMENTED
+   - [x] Added `category` field to quests table
+   - [x] Categories: civic, environmental, social, educational, technical, general
+   - [x] Category filtering in UI and API
+   - [x] Category-based statistics
 
-6. **Basic StatsBoard**
-   - [ ] API endpoint: `/boards/{board_id}/stats`
-   - [ ] Track: quests created/completed, XP earned/spent, active users
-   - [ ] Simple dashboard view in web UI
+6. **Basic StatsBoard** ✅ IMPLEMENTED
+   - [x] API endpoints: `/api/stats/board` and `/api/stats/user/{id}`
+   - [x] Tracks: quests by status/category, XP circulation, active users
+   - [x] Dashboard view at `/stats`
    - [ ] Export capability for analysis
 
 ### Phase 3: Federation Foundation (Weeks 5-8)
