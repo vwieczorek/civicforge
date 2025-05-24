@@ -13,6 +13,26 @@
 - ✅ **AWS Deployment Ready** - Complete infrastructure configuration prepared
 - ✅ **Security Hardening** - Environment-based secrets and configurable authentication
 
+---
+
+### 🛡️ Security Audit Findings (Semgrep, May 2025)
+
+A comprehensive Semgrep OSS scan was performed on all code and configuration files (excluding markdown and documentation). The following findings require attention before production release:
+
+**1. src/board_mvp/migrations.py**
+- Use of formatted SQL queries with f-strings: `cur.execute(f"PRAGMA table_info({table})")`
+- *Risk:* If the `table` variable is untrusted, this could allow SQL injection.
+- *Recommendation:* Use parameterized queries or validate `table` against an allowlist of expected table names.
+
+**2. src/board_mvp/web.py**
+- Multiple instances where user input could be passed to `requests.post` for endpoints like `/claim_quest`, `/submit_work`, `/verify_quest`, and `/boost_quest`.
+- *Risk:* If any user-controlled data is used to construct the request URL or payload, this could lead to Server-Side Request Forgery (SSRF).
+- *Recommendation:* Ensure all user input used in these requests is strictly validated against an allowlist of allowed values, and never forward arbitrary responses to the user.
+
+_No privacy leaks, secret exposures, or critical security issues were found in other code or configuration files._
+
+---
+
 #### Docker is Now the Preferred Development Method
 **🐳 RECOMMENDED**: Use Docker for all development and staging:
 ```bash
