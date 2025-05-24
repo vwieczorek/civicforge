@@ -1,0 +1,35 @@
+# CivicForge Board MVP Requirements
+
+# Core web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+requests==2.31.0
+
+# Database
+psycopg2-binary==2.9.9  # PostgreSQL adapter
+
+# Authentication (future)
+# pyjwt==2.8.0  # For better JWT handling
+# passlib[bcrypt]==1.7.4  # For better password hashing
+
+# Email (future)
+# python-jose[cryptography]==3.3.0
+# emails==0.6
+
+# Development
+python-dotenv==1.0.0  # For loading .env files
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1  # For testing FastAPI
+
+# Production deployment
+gunicorn==21.2.0  # Production WSGI server
+
+# Monitoring (optional)
+# sentry-sdk==1.38.0
+
+# CORS support (when needed)
+# fastapi-cors==0.0.6
