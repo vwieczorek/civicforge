@@ -30,6 +30,9 @@ class Quest:
     performer_id: Optional[int]
     verifier_id: Optional[int]
     status: str
+    category: Optional[str] = None
+    visibility: str = "board"
+    boost_level: int = 0
     created_at: datetime = datetime.utcnow()
     updated_at: datetime = datetime.utcnow()
 

@@ -4,6 +4,28 @@
 > **Boards** turn local ideas into tasks. **The Forge** links boards for bigger impact.  
 > Earn **Experience Points** when your work is verified—reputation that follows you anywhere on the platform.
 
+## 🚀 Quick Start (For Developers)
+
+```bash
+# Install dependencies
+pip install fastapi uvicorn python-multipart
+
+# Set up database
+export BOARD_DB_PATH=/path/to/civicforge/board.db
+python -m src.board_mvp.migrations
+
+# Start the server
+uvicorn src.board_mvp.web:app --reload
+
+# In another terminal, seed with test data
+python -m src.board_mvp.seed_tasks
+
+# Open http://localhost:8000
+# Login with: admin/admin123 or dev/dev123
+```
+
+**Current Status**: Authentication system implemented! See `CURRENT_STATUS.md` and `HANDOFF_NOTES.md` for details.
+
 ## 📁 Project Structure
 
 ```
