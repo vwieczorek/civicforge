@@ -149,7 +149,7 @@ The MVP now has authentication! Next steps:
 - **Dependencies**: Requires `python-multipart` for form handling (`pip install python-multipart`)
 - **Secret Key**: Now uses environment variable `CIVICFORGE_SECRET_KEY` (defaults to dev key if not set)
 - **Token Expiry**: Configurable via `TOKEN_EXPIRY_HOURS` environment variable (defaults to 24 hours)
-- **CORS**: Not configured - will need for separate frontend
+- **CORS**: Configurable via CORS_ALLOWED_ORIGINS environment variable (e.g., 'http://localhost:3000')
 - **Environment**: Copy `.env.example` to `.env` and set your values
 
 The platform is now secured with authentication and ready for deployment preparation!

@@ -1,5 +1,5 @@
 # CivicForge Development Handoff
-*From: Docker Production Setup Session - May 24, 2025*
+*From: Documentation & Security Hardening Session - May 25, 2025*
 *To: Next Development Agent*
 
 ## 🎯 Current State: DOCKER PRODUCTION READY
@@ -27,6 +27,12 @@ The CivicForge Board MVP is **production-ready** with Docker deployment, Postgre
 - **Environment Config**: All secrets properly externalized
 - **Health Monitoring**: Container and application health checks working
 - **Status**: READY FOR AWS DEPLOYMENT
+
+### 4. Documentation & Security Hardening - COMPLETE ✅
+- **Doc Typos & Guidance File**: Fixed project-structure snippet and renamed `math_model_guidance.md` in docs and updated `README.md` references.
+- **Migration Table PRAGMA Hardening**: Restricted `PRAGMA table_info(...)` calls to a whitelist of expected tables in `migrations.py`.
+- **CORS Support**: Added CORS middleware to `api.app`, configurable via `CORS_ALLOWED_ORIGINS` environment variable.
+- **SSRF Mitigations**: Introduced `safe_get` and `safe_post` helpers in `web.py` to validate outgoing API URLs against `API_BASE`.
 
 ## 🧪 Testing Status: ALL PASSING ✅
 
@@ -114,20 +120,14 @@ python -m src.board_mvp.seed_tasks  # Add test data
 ## 🔄 Next Priority Tasks
 
 ### Immediate (High Priority):
-1. **Add CORS Support** - Enable frontend separation
+1. **Implement Rate Limiting** - API resilience and abuse mitigation
    ```python
-   # Add to api.py or web.py
-   from fastapi.middleware.cors import CORSMiddleware
+   # Consider using slowapi or fastapi-limiter
    ```
 
-2. **Implement Rate Limiting** - API security
+2. **Add Error Monitoring** - Production observability
    ```python
-   # Consider: slowapi or fastapi-limiter
-   ```
-
-3. **Add Error Monitoring** - Production observability
-   ```python
-   # Consider: Sentry integration
+   # Consider Sentry or AWS CloudWatch integration
    ```
 
 ### Medium Priority:
@@ -136,10 +136,10 @@ python -m src.board_mvp.seed_tasks  # Add test data
 6. **API Documentation** - OpenAPI/Swagger enhancement
 
 ### Production Deployment:
-7. **Deploy to AWS** - Use prepared configuration in `deploy/aws/`
-8. **Set up monitoring** - CloudWatch, health checks
-9. **Configure SSL/HTTPS** - Production security
-10. **Load testing** - Performance validation
+7. **Deploy to AWS** - Follow the detailed guide in `deploy/aws/infrastructure.md` and run `deploy/aws/deploy.sh` to set up ECR, RDS, ECS, ALB, IAM roles, and secrets.
+8. **Set up monitoring** - CloudWatch logs, ECS service metrics, and health checks
+9. **Configure SSL/HTTPS** - Enforce TLS via ALB with ACM certificates
+10. **Load testing** - Validate performance and autoscaling thresholds
 
 ## 🔧 Database Configuration
 
@@ -233,4 +233,4 @@ The CivicForge Board MVP is now **enterprise-ready** with:
 **The next agent can focus on enhanced features, monitoring, and deployment rather than core infrastructure.**
 
 ---
-*End of Database Refactoring Session - May 24, 2025*
+*End of Documentation & Security Hardening Session - May 25, 2025*

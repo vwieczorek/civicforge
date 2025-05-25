@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request, Response, Cookie, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from typing import Optional
 import requests
+from urllib.parse import urljoin
 
 from . import api
 from .database import init_db
@@ -21,6 +22,20 @@ API_BASE = "http://localhost:8000/api"
 def get_auth_header(token: str) -> dict:
     """Get authorization header for API calls."""
     return {"Authorization": f"Bearer {token}"} if token else {}
+
+def safe_get(path: str, **kwargs):
+    """Make a safe GET request to the API, validating the URL against API_BASE."""
+    url = urljoin(API_BASE, path)
+    if not url.startswith(API_BASE):
+        raise HTTPException(status_code=400, detail="Invalid API request URL")
+    return requests.get(url, **kwargs)
+
+def safe_post(path: str, **kwargs):
+    """Make a safe POST request to the API, validating the URL against API_BASE."""
+    url = urljoin(API_BASE, path)
+    if not url.startswith(API_BASE):
+        raise HTTPException(status_code=400, detail="Invalid API request URL")
+    return requests.post(url, **kwargs)
 
 
 def base_html(content: str, token: Optional[str] = None) -> str:
@@ -80,34 +95,40 @@ def index(request: Request, error: str = "", success: str = "", category: str = 
     
     # Get current user info
     try:
-        resp = requests.get(f"{API_BASE}/me", headers=get_auth_header(token))
+        resp = safe_get("/me", headers=get_auth_header(token))
         if resp.status_code != 200:
             return RedirectResponse("/login?error=Session expired", status_code=303)
         current_user = resp.json()
-        
+
         # Get user's XP balance
-        xp_resp = requests.get(f"{API_BASE}/users/{current_user['id']}/experience", headers=get_auth_header(token))
-        xp_balance = xp_resp.json()["experience_balance"] if xp_resp.status_code == 200 else 0
-        
+        xp_resp = safe_get(f"/users/{current_user['id']}/experience", headers=get_auth_header(token))
+        xp_balance = xp_resp.json().get("experience_balance", 0) if xp_resp.status_code == 200 else 0
+
         content.append(f"<p>Welcome, {current_user['username']}! You have {xp_balance} XP.</p>")
+    except HTTPException:
+        raise
     except:
         return RedirectResponse("/login?error=Session expired", status_code=303)
-    
-    # Get categories
-    categories_resp = requests.get(f"{API_BASE}/categories")
-    categories = categories_resp.json()["categories"] if categories_resp.status_code == 200 else []
-    
+
+    # Get categories for filtering
+    categories_resp = safe_get("/categories")
+    categories = categories_resp.json().get("categories", []) if categories_resp.status_code == 200 else []
+
     # Show category filter
     content.append("<h2>Quest Categories</h2>")
     content.append("<a href='/'>All Quests</a> | ")
     for cat in categories:
         content.append(f"<a href='/?category={cat['name']}'>{cat['name'].title()} ({cat['count']})</a> | ")
-    
-    # Get quests
-    quests_url = f"{API_BASE}/quests"
+
+    # Get quests, validating category parameter
     if category:
-        quests_url += f"?category={category}"
-    quests_resp = requests.get(quests_url)
+        allowed = [cat.get("name") for cat in categories]
+        if category not in allowed:
+            return RedirectResponse("/?error=Invalid category", status_code=303)
+        path = f"/quests?category={category}"
+    else:
+        path = "/quests"
+    quests_resp = safe_get(path)
     quests = quests_resp.json() if quests_resp.status_code == 200 else []
     
     # Create quest form
@@ -201,7 +222,10 @@ def login_page(error: str = ""):
 @app.post("/login")
 def do_login(response: Response, username: str = Form(...), password: str = Form(...)):
     """Handle login form submission."""
-    resp = requests.post(f"{API_BASE}/auth/login", json={"username": username, "password": password})
+    resp = safe_post(
+        "/auth/login",
+        json={"username": username, "password": password}
+    )
     
     if resp.status_code == 200:
         data = resp.json()
@@ -247,13 +271,16 @@ def do_register(
     role: str = Form(...)
 ):
     """Handle registration form submission."""
-    resp = requests.post(f"{API_BASE}/auth/register", json={
-        "username": username,
-        "email": email,
-        "password": password,
-        "real_name": real_name,
-        "role": role
-    })
+    resp = safe_post(
+        "/auth/register",
+        json={
+            "username": username,
+            "email": email,
+            "password": password,
+            "real_name": real_name,
+            "role": role
+        }
+    )
     
     if resp.status_code == 200:
         data = resp.json()
@@ -284,8 +311,8 @@ def create_quest(
     if not token:
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
-    resp = requests.post(
-        f"{API_BASE}/quests",
+    resp = safe_post(
+        "/quests",
         json={"title": title, "description": description, "category": category},
         headers=get_auth_header(token)
     )
@@ -303,8 +330,8 @@ def claim_quest(token: Optional[str] = Cookie(None), quest_id: int = Form(...)):
     if not token:
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
-    resp = requests.post(
-        f"{API_BASE}/quests/{quest_id}/claim",
+    resp = safe_post(
+        f"/quests/{quest_id}/claim",
         headers=get_auth_header(token)
     )
     
@@ -321,8 +348,8 @@ def submit_work(token: Optional[str] = Cookie(None), quest_id: int = Form(...)):
     if not token:
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
-    resp = requests.post(
-        f"{API_BASE}/quests/{quest_id}/submit",
+    resp = safe_post(
+        f"/quests/{quest_id}/submit",
         headers=get_auth_header(token)
     )
     
@@ -343,8 +370,8 @@ def verify_quest(
     if not token:
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
-    resp = requests.post(
-        f"{API_BASE}/quests/{quest_id}/verify",
+    resp = safe_post(
+        f"/quests/{quest_id}/verify",
         json={"result": result},
         headers=get_auth_header(token)
     )
@@ -362,8 +389,8 @@ def boost_quest(token: Optional[str] = Cookie(None), quest_id: int = Form(...)):
     if not token:
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
-    resp = requests.post(
-        f"{API_BASE}/quests/{quest_id}/boost",
+    resp = safe_post(
+        f"/quests/{quest_id}/boost",
         headers=get_auth_header(token)
     )
     
@@ -381,7 +408,7 @@ def stats_dashboard(token: Optional[str] = Cookie(None)):
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
     # Get board stats
-    stats_resp = requests.get(f"{API_BASE}/stats/board", headers=get_auth_header(token))
+    stats_resp = safe_get(f"/stats/board", headers=get_auth_header(token))
     if stats_resp.status_code != 200:
         return RedirectResponse("/?error=Failed to load statistics", status_code=303)
     
