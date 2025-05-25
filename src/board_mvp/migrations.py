@@ -91,9 +91,10 @@ def run_migrations(db_path: str = None):
     conn.commit()
     print("Migrations complete!")
     
-    # Show current schema
+    # Show current schema (only for allowed tables)
     print("\nCurrent schema:")
-    for table in ["quests", "experience_ledger", "board_config"]:
+    allowed_tables = ["quests", "experience_ledger", "board_config"]
+    for table in allowed_tables:
         print(f"\n{table}:")
         cur.execute(f"PRAGMA table_info({table})")
         for col in cur.fetchall():

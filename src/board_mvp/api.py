@@ -7,11 +7,24 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 
 import os
+from fastapi.middleware.cors import CORSMiddleware
 from . import models
 from . import auth
 from .database import get_db, Database, init_db
 
 app = FastAPI(title="CivicForge Board MVP")
+
+# CORS configuration (for separate frontend applications)
+cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+if cors_origins:
+    origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Initialize the database
 init_db()
