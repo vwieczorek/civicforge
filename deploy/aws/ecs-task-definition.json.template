@@ -1,0 +1,52 @@
+{
+  "family": "civicforge-board-mvp",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-task-role",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "civicforge-app",
+      "image": "YOUR_ECR_REPO_URI:latest",
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "TOKEN_EXPIRY_HOURS",
+          "value": "24"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:civicforge/database-url"
+        },
+        {
+          "name": "CIVICFORGE_SECRET_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:civicforge/secret-key"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/civicforge-board-mvp",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
