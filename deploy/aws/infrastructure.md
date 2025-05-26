@@ -510,6 +510,12 @@ if [ -n "$SUBNET_2" ]; then
   SUBNETS_CONFIG="subnets=[$SUBNET_1,$SUBNET_2]"
 fi
 
+echo "Attempting to create/update service with SUBNETS_CONFIG: $SUBNETS_CONFIG and APP_SG_ID: $APP_SG_ID"
+if [ -z "$APP_SG_ID" ]; then
+  echo "Error: APP_SG_ID is not set. Please check Step 0 for security group creation."
+  exit 1
+fi
+
 aws ecs create-service \
   --cluster $CLUSTER_NAME \
   --service-name $SERVICE_NAME \
