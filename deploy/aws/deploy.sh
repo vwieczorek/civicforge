@@ -34,16 +34,9 @@ echo -e "${YELLOW}ECR Repository: ${ECR_URI}${NC}"
 echo -e "${GREEN}Logging into ECR...${NC}"
 aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_URI}
 
-# Build Docker image
-echo -e "${GREEN}Building Docker image...${NC}"
-docker build -t ${ECR_REPOSITORY}:latest .
-
-# Tag image for ECR
-docker tag ${ECR_REPOSITORY}:latest ${ECR_URI}:latest
-
-# Push image to ECR
-echo -e "${GREEN}Pushing image to ECR...${NC}"
-docker push ${ECR_URI}:latest
+# Build and push a platform-specific image to ECR
+echo -e "${GREEN}Building and pushing AMD64-compatible image to ECR...${NC}"
+docker buildx build --platform linux/amd64 -t "${ECR_URI}:latest" --push .
 
 # Update task definition with new image
 echo -e "${GREEN}Updating ECS task definition...${NC}"
