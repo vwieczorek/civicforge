@@ -124,23 +124,27 @@ class PostgreSQLAdapter(DatabaseAdapter):
         conn = self._get_conn()
         self._cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Convert SQLite placeholders to PostgreSQL style
-        if params:
-            query = self._convert_placeholders(query)
-        
-        # Handle RETURNING for INSERT statements
-        if query.strip().upper().startswith('INSERT') and 'RETURNING' not in query.upper():
-            query = query.rstrip(';') + ' RETURNING id;'
-        
-        self._cursor.execute(query, params)
-        
-        # Capture lastrowid for INSERT statements
-        if query.strip().upper().startswith('INSERT'):
-            result = self._cursor.fetchone()
-            if result and 'id' in result:
-                self._lastrowid = result['id']
-        
-        return self._cursor
+        try:
+            # Convert SQLite placeholders to PostgreSQL style
+            if params:
+                query = self._convert_placeholders(query)
+            
+            # Handle RETURNING for INSERT statements
+            if query.strip().upper().startswith('INSERT') and 'RETURNING' not in query.upper():
+                query = query.rstrip(';') + ' RETURNING id;'
+            
+            self._cursor.execute(query, params)
+            
+            # Capture lastrowid for INSERT statements
+            if query.strip().upper().startswith('INSERT'):
+                result = self._cursor.fetchone()
+                if result and 'id' in result:
+                    self._lastrowid = result['id']
+            
+            return self._cursor
+        except Exception as e:
+            conn.rollback()
+            raise e
     
     def executemany(self, query: str, params_list: List[tuple]) -> Any:
         conn = self._get_conn()
@@ -230,13 +234,21 @@ class Database:
     
     def fetchone(self, query: str, params: Optional[tuple] = None) -> Optional[Dict[str, Any]]:
         """Execute a query and fetch one row."""
-        self.execute(query, params)
-        return self.adapter.fetchone()
+        try:
+            self.execute(query, params)
+            return self.adapter.fetchone()
+        except Exception as e:
+            self.rollback()
+            raise e
     
     def fetchall(self, query: str, params: Optional[tuple] = None) -> List[Dict[str, Any]]:
         """Execute a query and fetch all rows."""
-        self.execute(query, params)
-        return self.adapter.fetchall()
+        try:
+            self.execute(query, params)
+            return self.adapter.fetchall()
+        except Exception as e:
+            self.rollback()
+            raise e
     
     def commit(self):
         """Commit the current transaction."""
