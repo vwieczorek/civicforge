@@ -246,6 +246,35 @@ def run_migrations(db: Database = None):
             ))
     
     db.commit()
+    
+    # Create default users after schema is ready
+    try:
+        from .auth import hash_password
+        
+        # Check if admin user exists
+        admin_exists = db.fetchone("SELECT id FROM users WHERE username=%s", ("admin",))
+        if not admin_exists:
+            print("Creating default admin user...")
+            admin_hash = hash_password("admin123")
+            db.execute("""
+                INSERT INTO users (username, email, password_hash, real_name, role, reputation, verified)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, ("admin", "admin@civicforge.org", admin_hash, "CivicForge Admin", "Organizer", 20, True))
+            db.commit()
+        
+        # Check if dev user exists
+        dev_exists = db.fetchone("SELECT id FROM users WHERE username=%s", ("dev",))
+        if not dev_exists:
+            print("Creating default dev user...")
+            dev_hash = hash_password("dev123")
+            db.execute("""
+                INSERT INTO users (username, email, password_hash, real_name, role, reputation, verified)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, ("dev", "dev@civicforge.org", dev_hash, "Core Developer", "Participant", 0, False))
+            db.commit()
+    except Exception as e:
+        print(f"Warning: Could not create default users: {e}")
+    
     print("Migrations complete!")
     
     # Show current schema summary

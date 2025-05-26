@@ -191,11 +191,14 @@ aws rds create-db-instance \
     --db-instance-class db.t3.micro \
     --engine postgres \
     --master-username $DB_MASTER_USERNAME \
+    --master-user-password $DB_PASSWORD \
     --allocated-storage 20 \
     --vpc-security-group-ids $DB_SG_ID \
     --no-publicly-accessible \
     --region $REGION
 ```
+
+> **Important:** The `--master-user-password` parameter was missing in the original command, which would cause the database creation to fail.
 
 ### **Step 6: Wait for and Retrieve the DB Endpoint**
 
@@ -219,14 +222,15 @@ Store sensitive data like your database URL (with the generated password) and ap
 
 ```bash
 # Database URL secret (using the generated DB_PASSWORD)
+# NOTE: Using the default 'postgres' database which always exists
 DB_SECRET_ARN=$(aws secretsmanager create-secret \
     --name civicforge/database-url \
     --description "Database connection string for CivicForge" \
-    --secret-string "postgresql://$DB_MASTER_USERNAME:$DB_PASSWORD@$DB_ENDPOINT:5432/${DB_INSTANCE_IDENTIFIER}_db" \
+    --secret-string "postgresql://$DB_MASTER_USERNAME:$DB_PASSWORD@$DB_ENDPOINT:5432/postgres" \
     --region $REGION \
     --query ARN --output text)
 echo "Database URL Secret ARN: $DB_SECRET_ARN"
-echo "IMPORTANT: The database name in the connection string is assumed to be ${DB_INSTANCE_IDENTIFIER}_db. Create this database manually via psql or ensure your app does."
+echo "Note: Using the default 'postgres' database. The application will create its tables automatically on first run."
 
 
 # Application secret key (for session management, etc.)
@@ -633,3 +637,28 @@ aws ecs update-service \
 * **Manual Snapshots:** Take snapshots before major changes.
 * **Infrastructure as Code (IaC):** Use CloudFormation, CDK, or Terraform for reproducibility.
 * **Test Restore Procedures.**
+
+---
+
+## Troubleshooting Common Issues
+
+### Database Connection Errors
+* **"database does not exist"**: The application uses the default `postgres` database. If you see this error, check that the DATABASE_URL secret is using `postgres` as the database name.
+* **"role cannot be assumed"**: Ensure the ECS task execution role name in the task definition matches exactly: `civicforge-task-execution-role` (not `civicforge-execution-role`).
+
+### Application Access Issues
+* **Cannot access the application**: By default, the security group allows access from all IPs. To restrict access:
+  ```bash
+  # Remove open access
+  aws ec2 revoke-security-group-ingress --group-id $APP_SG_ID --protocol tcp --port 8000 --cidr 0.0.0.0/0 --region $REGION
+  
+  # Add your IP only
+  MY_IP=$(curl -s https://api.ipify.org)
+  aws ec2 authorize-security-group-ingress --group-id $APP_SG_ID --protocol tcp --port 8000 --cidr ${MY_IP}/32 --region $REGION
+  ```
+
+### Default Users
+* The application creates default users automatically on first deployment:
+  - Username: `admin`, Password: `admin123`
+  - Username: `dev`, Password: `dev123`
+* If users are not created, check the deployment logs or manually call the `/api/init-default-users` endpoint.

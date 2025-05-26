@@ -5,7 +5,7 @@
   "cpu": "256",
   "memory": "512",
   "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-task-role",
-  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-execution-role",
+  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-task-execution-role",
   "containerDefinitions": [
     {
       "name": "civicforge-app",

@@ -40,6 +40,9 @@ docker buildx build --platform linux/amd64 -t "${ECR_URI}:latest" --push .
 
 # Update task definition with new image
 echo -e "${GREEN}Updating ECS task definition...${NC}"
+# Create a temporary copy of the template
+cp deploy/aws/ecs-task-definition.json.template deploy/aws/ecs-task-definition.json
+# Replace placeholders in the copy
 sed -i.bak "s|YOUR_ACCOUNT_ID|${AWS_ACCOUNT_ID}|g" deploy/aws/ecs-task-definition.json
 sed -i.bak "s|YOUR_ECR_REPO_URI|${ECR_URI}|g" deploy/aws/ecs-task-definition.json
 
@@ -73,4 +76,25 @@ aws ecs wait services-stable \
 echo -e "${GREEN}Deployment complete!${NC}"
 
 # Restore original task definition file
-mv deploy/aws/ecs-task-definition.json.bak deploy/aws/ecs-task-definition.json
+rm deploy/aws/ecs-task-definition.json
+rm deploy/aws/ecs-task-definition.json.bak
+
+# Initialize default users if needed
+echo -e "${YELLOW}Waiting for service to be ready...${NC}"
+sleep 30
+
+# Get the task IP
+TASK_ARN=$(aws ecs list-tasks --cluster ${ECS_CLUSTER} --service-name ${ECS_SERVICE} --desired-status RUNNING --query 'taskArns[0]' --output text --region ${AWS_REGION})
+if [ -n "$TASK_ARN" ] && [ "$TASK_ARN" != "None" ]; then
+    ENI_ID=$(aws ecs describe-tasks --cluster ${ECS_CLUSTER} --tasks ${TASK_ARN} --query 'tasks[0].attachments[0].details[?name==`networkInterfaceId`].value | [0]' --output text --region ${AWS_REGION})
+    if [ -n "$ENI_ID" ] && [ "$ENI_ID" != "None" ]; then
+        PUBLIC_IP=$(aws ec2 describe-network-interfaces --network-interface-ids ${ENI_ID} --query 'NetworkInterfaces[0].Association.PublicIp' --output text --region ${AWS_REGION})
+        if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "None" ]; then
+            echo -e "${GREEN}Service is available at: http://${PUBLIC_IP}:8000${NC}"
+            
+            # Initialize default users
+            echo -e "${YELLOW}Initializing default users...${NC}"
+            curl -s -X POST "http://${PUBLIC_IP}:8000/api/init-default-users" -H "Content-Type: application/json" || echo "Could not initialize users (this is normal if they already exist)"
+        fi
+    fi
+fi
