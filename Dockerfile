@@ -26,8 +26,9 @@ USER civicforge
 EXPOSE 8000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/api/health')" || exit 1
 
 # Run the application
+# Note: The application automatically runs database migrations on startup
 CMD ["uvicorn", "src.board_mvp.web:app", "--host", "0.0.0.0", "--port", "8000"]

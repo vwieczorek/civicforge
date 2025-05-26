@@ -36,6 +36,23 @@ if cors_origins:
 # Initialize the database
 init_db()
 
+# Run migrations on startup
+def run_migrations():
+    """Run database migrations on startup."""
+    try:
+        from .migrations_pg import run_migrations as pg_migrations
+        db = get_db()
+        # Check if we're using PostgreSQL
+        if hasattr(db.adapter, 'connection_string') and 'postgresql' in db.adapter.connection_string:
+            print("Running PostgreSQL migrations...")
+            pg_migrations()
+            print("Migrations completed successfully")
+    except Exception as e:
+        print(f"Warning: Could not run migrations: {e}")
+
+# Run migrations when the app starts
+run_migrations()
+
 # Weekly decay amount for experience points
 WEEKLY_DECAY = 1
 
@@ -672,3 +689,37 @@ def health_check():
             raise HTTPException(status_code=503, detail="Database check failed")
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Health check failed: {str(e)}")
+
+
+@app.post("/init-default-users")
+def init_default_users():
+    """Initialize default admin and dev users."""
+    db = get_db()
+    created_users = []
+    
+    try:
+        # Check if admin user exists
+        admin_exists = db.fetchone("SELECT id FROM users WHERE username=?", ("admin",))
+        if not admin_exists:
+            admin_hash = auth.hash_password("admin123")
+            db.execute("""
+                INSERT INTO users (username, email, password_hash, real_name, role, reputation, verified, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, ("admin", "admin@civicforge.org", admin_hash, "CivicForge Admin", "Organizer", 20, True, datetime.utcnow().isoformat()))
+            db.commit()
+            created_users.append("admin")
+        
+        # Check if dev user exists
+        dev_exists = db.fetchone("SELECT id FROM users WHERE username=?", ("dev",))
+        if not dev_exists:
+            dev_hash = auth.hash_password("dev123")
+            db.execute("""
+                INSERT INTO users (username, email, password_hash, real_name, role, reputation, verified, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, ("dev", "dev@civicforge.org", dev_hash, "Core Developer", "Participant", 0, False, datetime.utcnow().isoformat()))
+            db.commit()
+            created_users.append("dev")
+        
+        return {"message": "Default users initialized", "created": created_users}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create users: {str(e)}")

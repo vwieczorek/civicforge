@@ -12,6 +12,24 @@ app = FastAPI(title="CivicForge Board Web UI")
 # Initialize the database
 init_db()
 
+# Run migrations on startup
+def run_migrations():
+    """Run database migrations on startup."""
+    try:
+        from .migrations_pg import run_migrations as pg_migrations
+        from .database import get_db
+        db = get_db()
+        # Check if we're using PostgreSQL
+        if hasattr(db.adapter, 'connection_string') and 'postgresql' in db.adapter.connection_string:
+            print("Running PostgreSQL migrations...")
+            pg_migrations()
+            print("Migrations completed successfully")
+    except Exception as e:
+        print(f"Warning: Could not run migrations: {e}")
+
+# Run migrations when the app starts
+run_migrations()
+
 # Mount the existing API under /api for convenience
 app.mount("/api", api.app)
 

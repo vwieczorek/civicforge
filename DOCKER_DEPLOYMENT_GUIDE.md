@@ -198,6 +198,33 @@ docker events --filter container=civicforge-app-1
 - Use RDS with encryption at rest
 - Network isolation with VPC
 
+## 🚀 AWS Deployment
+
+### Quick Deploy to AWS ECS
+```bash
+# Set up AWS infrastructure (one-time)
+cd deploy/aws
+./infrastructure-setup.sh  # Follow infrastructure.md
+
+# Deploy application
+./deploy.sh
+```
+
+### Important AWS Notes
+1. **Database**: Uses RDS PostgreSQL with the default `postgres` database
+2. **Migrations**: Run automatically on container startup
+3. **Default Users**: Created via `/api/init-default-users` endpoint
+4. **Security Groups**: Default allows port 8000 from anywhere, restrict with:
+   ```bash
+   MY_IP=$(curl -s https://api.ipify.org)
+   aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol tcp --port 8000 --cidr ${MY_IP}/32
+   ```
+
+### Common AWS Issues
+- **Database errors**: Ensure DATABASE_URL uses `postgres` database
+- **IAM errors**: Check task execution role is `civicforge-task-execution-role`
+- **Access denied**: Verify security group rules allow your IP
+
 ## 🎯 Next Steps
 
 1. **Test the Docker setup** - Verify everything works
