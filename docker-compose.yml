@@ -23,6 +23,7 @@ services:
       DATABASE_URL: postgresql://civicforge:civicforge_dev_password@postgres:5432/civicforge_db
       CIVICFORGE_SECRET_KEY: dev-secret-key-change-in-production
       TOKEN_EXPIRY_HOURS: 24
+      API_BASE_URL: http://127.0.0.1:8000/api
     depends_on:
       postgres:
         condition: service_healthy

@@ -2,6 +2,13 @@ from enum import Enum
 from datetime import datetime
 from typing import Optional, List
 
+
+def safe_datetime(value):
+    """Safely convert a value to datetime, handling both datetime objects and strings."""
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(value)
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
@@ -130,7 +137,7 @@ def get_user_by_id(user_id: int) -> models.User:
         verified=bool(row['verified']),
         role=row['role'],
         reputation=row['reputation'],
-        created_at=datetime.fromisoformat(row['created_at']),
+        created_at=safe_datetime(row['created_at']),
     )
 
 
@@ -263,7 +270,7 @@ def list_users():
             verified=bool(row['verified']),
             role=row['role'],
             reputation=row['reputation'],
-            created_at=datetime.fromisoformat(row['created_at']),
+            created_at=safe_datetime(row['created_at']),
         )
         for row in rows
     ]
@@ -351,8 +358,8 @@ def get_quest_by_id(quest_id: int) -> models.Quest:
         performer_id=row['performer_id'],
         verifier_id=row['verifier_id'],
         status=row['status'],
-        created_at=datetime.fromisoformat(row['created_at']),
-        updated_at=datetime.fromisoformat(row['updated_at']),
+        created_at=safe_datetime(row['created_at']),
+        updated_at=safe_datetime(row['updated_at']),
         category=row['category'],
         visibility=row['visibility'],
         boost_level=row['boost_level'],
@@ -453,8 +460,8 @@ def list_quests(category: Optional[str] = None):
             performer_id=row['performer_id'],
             verifier_id=row['verifier_id'],
             status=row['status'],
-            created_at=datetime.fromisoformat(row['created_at']),
-            updated_at=datetime.fromisoformat(row['updated_at']),
+            created_at=safe_datetime(row['created_at']),
+            updated_at=safe_datetime(row['updated_at']),
             category=row['category'],
             visibility=row['visibility'],
             boost_level=row['boost_level'],
@@ -565,7 +572,7 @@ def get_board_stats():
     active_result = db.fetchone("""
         SELECT COUNT(DISTINCT user_id) as count 
         FROM experience_ledger 
-        WHERE timestamp > datetime('now', '-7 days')
+        WHERE timestamp > NOW() - INTERVAL '7 days'
     """)
     active_users_week = active_result['count'] if active_result else 0
     

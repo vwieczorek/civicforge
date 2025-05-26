@@ -15,8 +15,9 @@ init_db()
 # Mount the existing API under /api for convenience
 app.mount("/api", api.app)
 
-# Base URL for API calls
-API_BASE = "http://localhost:8000/api"
+# Base URL for API calls - use environment variable or default to localhost
+import os
+API_BASE = os.environ.get("API_BASE_URL", "http://localhost:8000/api")
 
 
 def get_auth_header(token: str) -> dict:
@@ -25,16 +26,18 @@ def get_auth_header(token: str) -> dict:
 
 def safe_get(path: str, **kwargs):
     """Make a safe GET request to the API, validating the URL against API_BASE."""
-    url = urljoin(API_BASE, path)
-    if not url.startswith(API_BASE):
-        raise HTTPException(status_code=400, detail="Invalid API request URL")
+    # Simple string concatenation instead of urljoin
+    if not path.startswith('/'):
+        path = '/' + path
+    url = API_BASE + path
     return requests.get(url, **kwargs)
 
 def safe_post(path: str, **kwargs):
     """Make a safe POST request to the API, validating the URL against API_BASE."""
-    url = urljoin(API_BASE, path)
-    if not url.startswith(API_BASE):
-        raise HTTPException(status_code=400, detail="Invalid API request URL")
+    # Simple string concatenation instead of urljoin
+    if not path.startswith('/'):
+        path = '/' + path
+    url = API_BASE + path
     return requests.post(url, **kwargs)
 
 
