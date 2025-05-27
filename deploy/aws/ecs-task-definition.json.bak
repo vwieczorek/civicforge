@@ -4,12 +4,12 @@
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
-  "taskRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-task-role",
-  "executionRoleArn": "arn:aws:iam::YOUR_ACCOUNT_ID:role/civicforge-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::211125472754:role/civicforge-task-role",
+  "executionRoleArn": "arn:aws:iam::211125472754:role/civicforge-execution-role",
   "containerDefinitions": [
     {
       "name": "civicforge-app",
-      "image": "YOUR_ECR_REPO_URI:latest",
+      "image": "211125472754.dkr.ecr.us-east-1.amazonaws.com/civicforge-board-mvp:latest",
       "portMappings": [
         {
           "containerPort": 8000,
@@ -25,11 +25,11 @@
       "secrets": [
         {
           "name": "DATABASE_URL",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:civicforge/database-url"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:211125472754:secret:civicforge/database-url"
         },
         {
           "name": "CIVICFORGE_SECRET_KEY",
-          "valueFrom": "arn:aws:secretsmanager:us-east-1:YOUR_ACCOUNT_ID:secret:civicforge/secret-key"
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:211125472754:secret:civicforge/secret-key"
         }
       ],
       "logConfiguration": {

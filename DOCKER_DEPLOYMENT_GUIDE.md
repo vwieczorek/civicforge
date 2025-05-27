@@ -99,8 +99,16 @@ docker-compose ps  # Shows service status
 ```
 
 ### Health Endpoints
-- **Application**: `curl http://localhost:8000/api/health`
+- **Application**: Health check at `/api/health`
+  ```bash
+  # Using Python urllib (preferred - no external dependencies)
+  python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/api/health').read().decode())"
+  
+  # Note: Avoid using curl for health checks - use Python urllib instead
+  ```
 - **Database**: Automatic health checks in docker-compose
+
+⚠️ **Important**: All health checks and tests should use Python's `urllib` library instead of `curl` to avoid external dependencies in containers.
 
 ### Troubleshooting
 ```bash

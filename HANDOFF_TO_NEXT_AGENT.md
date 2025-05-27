@@ -1,59 +1,63 @@
 # CivicForge Development Handoff
-*From: Documentation & Security Hardening Session - May 25, 2025*
+*From: Secure Access Implementation & AWS Deployment - May 27, 2025*
 *To: Next Development Agent*
 
-## 🎯 Current State: DOCKER PRODUCTION READY
+## 🎯 Current State: DEPLOYED TO AWS WITH SECURE INVITES
 
-The CivicForge Board MVP is **production-ready** with Docker deployment, PostgreSQL backend, and all boolean compatibility issues resolved.
+The CivicForge Board MVP is **deployed and running on AWS ECS** with a complete Role-Based Access Control (RBAC) system and secure invite functionality.
 
 ## ✅ What Was Completed This Session
 
-### 1. Docker Production Setup - COMPLETE ✅
-- **Full Docker Stack**: PostgreSQL + CivicForge application containerized
-- **Health Monitoring**: Fixed PostgreSQL and application health checks
-- **Boolean Compatibility**: Resolved all PostgreSQL boolean vs SQLite integer issues
-- **Status**: FULLY TESTED AND WORKING IN DOCKER
+### 1. Secure Access Control System - COMPLETE ✅
+- **RBAC Implementation**: 5 roles (Owner, Organizer, Reviewer, Friend, Participant)
+- **Invite System**: Cryptographically secure tokens using `secrets.token_urlsafe()`
+- **Board Memberships**: Granular permissions per user per board
+- **JWT Authentication**: Secure API access with bearer tokens
+- **Status**: FULLY TESTED AND DEPLOYED
 
-### 2. Database Production Readiness - COMPLETE ✅
-- **PostgreSQL Backend**: Running in Docker container with proper schema
-- **Data Type Fixes**: All boolean fields now properly compatible with PostgreSQL
-- **Health Checks**: Database connectivity monitoring working
-- **Migration Scripts**: Both SQLite and PostgreSQL migrations working
-- **Status**: PRODUCTION DATABASE READY
+### 2. AWS ECS Deployment - COMPLETE ✅
+- **ECS Fargate**: Deployed and running (see AWS console for current IP)
+- **RDS PostgreSQL**: Production database with automatic migrations
+- **Health Checks**: Fixed to use Python urllib instead of curl
+- **IAM Roles**: Proper execution roles configured
+- **Secrets Manager**: Database credentials and JWT secrets secured
+- **Status**: LIVE AND OPERATIONAL
 
-### 3. Deployment Infrastructure - COMPLETE ✅
-- **Docker Preferred**: Full stack deployment with docker-compose
-- **AWS Ready**: ECS task definition, deployment scripts, infrastructure guide
-- **Environment Config**: All secrets properly externalized
-- **Health Monitoring**: Container and application health checks working
-- **Status**: READY FOR AWS DEPLOYMENT
+### 3. Bug Fixes Applied - COMPLETE ✅
+- **Fixed `secrets.urlsafe()` → `secrets.token_urlsafe()`**: Invite token generation
+- **Fixed health check path**: `/health` → `/api/health`
+- **Fixed IAM role names**: Corrected execution role references
+- **Fixed member removal**: PostgreSQL cursor.rowcount compatibility
+- **Fixed Docker architecture**: AMD64 builds for Fargate
+- **Status**: ALL CRITICAL BUGS RESOLVED
 
-### 4. Documentation & Security Hardening - COMPLETE ✅
-- **Doc Typos & Guidance File**: Fixed project-structure snippet and renamed `math_model_guidance.md` in docs and updated `README.md` references.
-- **Migration Table PRAGMA Hardening**: Restricted `PRAGMA table_info(...)` calls to a whitelist of expected tables in `migrations.py`.
-- **CORS Support**: Added CORS middleware to `api.app`, configurable via `CORS_ALLOWED_ORIGINS` environment variable.
-- **SSRF Mitigations**: Introduced `safe_get` and `safe_post` helpers in `web.py` to validate outgoing API URLs against `API_BASE`.
+### 4. Testing & Documentation - COMPLETE ✅
+- **Comprehensive Test Suite**: 10/10 core features passing
+- **Deployment Guides**: Updated with lessons learned
+- **Troubleshooting Docs**: Common issues and solutions
+- **API Testing Tools**: Created test scripts for all endpoints
 
-## 🧪 Testing Status: ALL PASSING ✅
+## 🌐 Current Live Deployment
 
-### Docker Production Testing Results:
+### AWS ECS Production:
+- **URL**: http://<TASK_PUBLIC_IP>:8000 (changes with each deployment)
+- **Admin User**: admin/admin123 (30 XP, board owner)
+- **Task Definition**: civicforge-board-mvp:27
+- **Cluster**: civicforge-cluster
+- **Service**: civicforge-board-service
+
+### Test Results (All Passing):
 ```bash
-# Full Docker Stack (RECOMMENDED)
-✅ PostgreSQL container healthy and running
-✅ Application container healthy and running  
-✅ Database connectivity working perfectly
-✅ Health checks passing (no more FATAL errors)
-✅ User registration/authentication working
-✅ Boolean fields properly compatible
-✅ Quest lifecycle fully functional
-✅ API endpoints all working
-✅ Web interface accessible at localhost:8000
-
-# Alternative Testing Confirmed:
-✅ SQLite compatibility maintained
-✅ PostgreSQL direct connection working
-✅ Database switching working (env vars)
-✅ AWS health check endpoints ready
+✅ Board ownership and permissions
+✅ Health checks (urllib-based)
+✅ User authentication (JWT)
+✅ Invite creation and redemption
+✅ Role-based access control
+✅ Member management (add/remove)
+✅ Quest creation (with XP)
+✅ PostgreSQL migrations
+✅ Secrets management
+✅ Container health monitoring
 ```
 
 ## 🚀 How to Run Right Now
@@ -120,26 +124,32 @@ python -m src.board_mvp.seed_tasks  # Add test data
 ## 🔄 Next Priority Tasks
 
 ### Immediate (High Priority):
-1. **Implement Rate Limiting** - API resilience and abuse mitigation
+1. **Add Load Balancer** - The service needs an ALB for:
+   - Stable DNS name
+   - SSL/TLS termination
+   - Health check routing
+   - Auto-scaling support
+
+2. **Implement Rate Limiting** - API resilience
    ```python
    # Consider using slowapi or fastapi-limiter
    ```
 
-2. **Add Error Monitoring** - Production observability
+3. **Add Error Monitoring** - Production observability
    ```python
-   # Consider Sentry or AWS CloudWatch integration
+   # CloudWatch logs are working, add application metrics
    ```
 
 ### Medium Priority:
 4. **Email Verification Flow** - User registration security
 5. **Password Reset Flow** - User experience improvement
-6. **API Documentation** - OpenAPI/Swagger enhancement
+6. **Invite Email Notifications** - Send invite links via email
+7. **Board Creation API** - Currently only board_001 exists
 
-### Production Deployment:
-7. **Deploy to AWS** - Follow the detailed guide in `deploy/aws/infrastructure.md` and run `deploy/aws/deploy.sh` to set up ECR, RDS, ECS, ALB, IAM roles, and secrets.
-8. **Set up monitoring** - CloudWatch logs, ECS service metrics, and health checks
-9. **Configure SSL/HTTPS** - Enforce TLS via ALB with ACM certificates
-10. **Load testing** - Validate performance and autoscaling thresholds
+### Production Enhancements:
+8. **Configure Auto-scaling** - Handle traffic spikes
+9. **Set up CloudWatch Alarms** - Proactive monitoring
+10. **Add APM** - Application Performance Monitoring
 
 ## 🔧 Database Configuration
 
@@ -176,23 +186,31 @@ The application automatically detects the database type:
 - **Schema Compatibility**: Identical table structures
 - **Data Migration**: Preserves existing SQLite data
 
-## ⚠️ Important Notes
+## ⚠️ Critical Deployment Notes
 
-### Security:
-- **SECRET_KEY**: Now environment-based (was hardcoded)
-- **Database credentials**: Use environment variables
-- **CORS**: Not yet configured (needed for frontend)
+### When Deploying Updates:
+1. **ALWAYS use `--platform linux/amd64`** when building Docker images
+2. **Wait 3-5 minutes** for ECS deployment to complete
+3. **Check CloudWatch logs** if tasks are restarting
+4. **Get new IP address** after deployment (changes each time)
 
-### Dependencies:
-- **psycopg2-binary**: Required for PostgreSQL (already installed)
-- **fastapi**: Core framework
-- **uvicorn**: ASGI server
-- **python-multipart**: Form handling
+### Common Pitfalls to Avoid:
+- ❌ Using `secrets.urlsafe()` - use `secrets.token_urlsafe()`
+- ❌ Using `cursor.rowcount` with PostgreSQL - check existence first
+- ❌ Using curl in health checks - use Python urllib
+- ❌ Testing before deployment completes - wait for stability
+- ❌ Forgetting platform flag - causes "exec format error"
 
-### Known Issues Fixed:
-- ✅ SQLite threading issues (resolved with thread-local connections)
-- ✅ datetime.utcnow() deprecation warnings (still present but non-critical)
-- ✅ Database connection management (abstracted)
+### Database Compatibility:
+- **SQLite**: Uses `?` placeholders, returns `cursor.rowcount`
+- **PostgreSQL**: Uses `%s` placeholders, no `rowcount` on cursor
+- **Adapter**: Handles translation automatically
+
+### Current Security:
+- **JWT Tokens**: 24-hour expiry
+- **Invite Tokens**: Cryptographically secure, single/multi-use
+- **CORS**: Configured via environment variable
+- **Secrets**: Stored in AWS Secrets Manager
 
 ## 🎯 Success Metrics
 
