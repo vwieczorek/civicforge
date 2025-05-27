@@ -1,7 +1,7 @@
 """Authentication utilities for CivicForge Board MVP."""
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 import hashlib
 import hmac
 import secrets
@@ -96,3 +96,100 @@ def get_current_user_id(token: str) -> Optional[int]:
     if payload:
         return payload.get('user_id')
     return None
+
+
+# Role-based permissions
+ROLE_PERMISSIONS = {
+    "owner": {
+        "view_board": True,
+        "create_quest": True,
+        "edit_any_quest": True,
+        "delete_any_quest": True,
+        "verify_quest": True,
+        "manage_members": True,
+        "create_invites": True,
+        "view_analytics": True
+    },
+    "organizer": {
+        "view_board": True,
+        "create_quest": True,
+        "edit_own_quest": True,
+        "verify_quest": True,
+        "create_invites": True,
+        "view_analytics": True
+    },
+    "reviewer": {
+        "view_board": True,
+        "verify_quest": True,
+        "comment_on_quest": True,
+        "view_analytics": True
+    },
+    "friend": {
+        "view_board": True,
+        "create_quest": True,
+        "claim_quest": True,
+        "verify_quest": True
+    },
+    "participant": {
+        "view_board": True,
+        "claim_quest": True,
+        "submit_work": True
+    }
+}
+
+
+def generate_invite_token() -> str:
+    """Generate a cryptographically secure invite token."""
+    return secrets.token_urlsafe(32)
+
+
+def create_board_invite(
+    board_id: str,
+    created_by_user_id: int,
+    role: str,
+    email: Optional[str] = None,
+    max_uses: int = 1,
+    expires_hours: int = 48
+) -> Dict:
+    """Create a new board invitation."""
+    if role not in ROLE_PERMISSIONS:
+        raise ValueError(f"Invalid role: {role}")
+    
+    return {
+        "board_id": board_id,
+        "created_by_user_id": created_by_user_id,
+        "invite_token": generate_invite_token(),
+        "email": email,
+        "role": role,
+        "permissions": ROLE_PERMISSIONS[role],
+        "max_uses": max_uses,
+        "used_count": 0,
+        "expires_at": datetime.utcnow() + timedelta(hours=expires_hours),
+        "created_at": datetime.utcnow()
+    }
+
+
+def validate_invite_token(invite: Dict) -> bool:
+    """Validate an invite token hasn't expired and hasn't exceeded max uses."""
+    if not invite:
+        return False
+    
+    # Check expiration
+    if isinstance(invite['expires_at'], str):
+        expires_at = datetime.fromisoformat(invite['expires_at'])
+    else:
+        expires_at = invite['expires_at']
+    
+    if datetime.utcnow() > expires_at:
+        return False
+    
+    # Check usage
+    if invite['used_count'] >= invite['max_uses']:
+        return False
+    
+    return True
+
+
+def check_permission(permissions: Dict[str, bool], permission: str) -> bool:
+    """Check if a set of permissions includes a specific permission."""
+    return permissions.get(permission, False)

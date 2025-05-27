@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 
 def safe_datetime(value):
@@ -89,6 +89,34 @@ class QuestStatus(str, Enum):
     CANCELLED = "S12_CANCELLED"
 
 
+class InviteCreate(BaseModel):
+    board_id: str = "board_001"  # Default to primary board for MVP
+    role: str = "friend"
+    email: Optional[str] = None
+    max_uses: int = 1
+    expires_hours: int = 48
+
+
+class InviteResponse(BaseModel):
+    invite_url: str
+    expires_at: datetime
+    role: str
+
+
+class JoinBoardRequest(BaseModel):
+    token: str
+
+
+class BoardMemberResponse(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    real_name: str
+    role: str
+    permissions: Dict[str, bool]
+    joined_at: datetime
+
+
 def add_experience(user_id: int, amount: int, entry_type: str, quest_id: Optional[int] = None):
     """Insert an experience ledger entry."""
     db = get_db()
@@ -174,6 +202,42 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     return user_id
 
 
+def get_board_membership(board_id: str, user_id: int) -> Optional[Dict]:
+    """Get a user's membership for a board."""
+    db = get_db()
+    row = db.fetchone(
+        "SELECT id, role, permissions FROM board_memberships WHERE board_id=? AND user_id=?",
+        (board_id, user_id)
+    )
+    if row:
+        import json
+        permissions = json.loads(row['permissions']) if isinstance(row['permissions'], str) else row['permissions']
+        return {
+            'id': row['id'],
+            'role': row['role'],
+            'permissions': permissions
+        }
+    return None
+
+
+def check_board_permission(board_id: str, user_id: int, permission: str) -> bool:
+    """Check if a user has a specific permission on a board."""
+    membership = get_board_membership(board_id, user_id)
+    if not membership:
+        # Check if user is board owner (first user to create content on board)
+        db = get_db()
+        first_quest = db.fetchone(
+            "SELECT creator_id FROM quests ORDER BY created_at LIMIT 1"
+        )
+        if first_quest and first_quest['creator_id'] == user_id:
+            # Grant owner permissions to first quest creator
+            return auth.check_permission(auth.ROLE_PERMISSIONS['owner'], permission)
+        
+        # Default permissions for all authenticated users (participant level)
+        return auth.check_permission(auth.ROLE_PERMISSIONS['participant'], permission)
+    return auth.check_permission(membership['permissions'], permission)
+
+
 @app.post("/auth/register", response_model=TokenResponse)
 def register(user: UserRegister):
     """Register a new user with email and password."""
@@ -236,6 +300,208 @@ def login(credentials: UserLogin):
     return TokenResponse(token=token, user_id=user_id, username=username)
 
 
+@app.post("/boards/{board_id}/invites", response_model=InviteResponse)
+def create_board_invite(
+    board_id: str,
+    invite_data: InviteCreate,
+    current_user_id: int = Depends(get_current_user)
+):
+    """Create an invitation to join a board."""
+    # Check if user has permission to create invites
+    if not check_board_permission(board_id, current_user_id, "create_invites"):
+        raise HTTPException(status_code=403, detail="No permission to create invites")
+    
+    # Create invite
+    invite = auth.create_board_invite(
+        board_id=board_id,
+        created_by_user_id=current_user_id,
+        role=invite_data.role,
+        email=invite_data.email,
+        max_uses=invite_data.max_uses,
+        expires_hours=invite_data.expires_hours
+    )
+    
+    # Save to database
+    db = get_db()
+    import json
+    db.execute(
+        """INSERT INTO board_invites 
+        (board_id, created_by_user_id, invite_token, email, role, permissions, max_uses, used_count, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            invite['board_id'],
+            invite['created_by_user_id'],
+            invite['invite_token'],
+            invite['email'],
+            invite['role'],
+            json.dumps(invite['permissions']),
+            invite['max_uses'],
+            invite['used_count'],
+            invite['expires_at'].isoformat(),
+            invite['created_at'].isoformat()
+        )
+    )
+    db.commit()
+    
+    # Generate invite URL
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
+    invite_url = f"{base_url}/board/{board_id}/join?token={invite['invite_token']}"
+    
+    return InviteResponse(
+        invite_url=invite_url,
+        expires_at=invite['expires_at'],
+        role=invite['role']
+    )
+
+
+@app.post("/boards/{board_id}/join")
+def join_board(
+    board_id: str,
+    join_request: JoinBoardRequest,
+    current_user_id: int = Depends(get_current_user)
+):
+    """Accept an invitation to join a board."""
+    db = get_db()
+    
+    # Get invite by token
+    row = db.fetchone(
+        "SELECT * FROM board_invites WHERE board_id=? AND invite_token=?",
+        (board_id, join_request.token)
+    )
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Invalid invite")
+    
+    # Convert row to dict for validation
+    import json
+    invite = {
+        'id': row['id'],
+        'board_id': row['board_id'],
+        'created_by_user_id': row['created_by_user_id'],
+        'invite_token': row['invite_token'],
+        'email': row['email'],
+        'role': row['role'],
+        'permissions': json.loads(row['permissions']) if isinstance(row['permissions'], str) else row['permissions'],
+        'max_uses': row['max_uses'],
+        'used_count': row['used_count'],
+        'expires_at': row['expires_at'],
+        'created_at': row['created_at']
+    }
+    
+    # Validate invite
+    if not auth.validate_invite_token(invite):
+        raise HTTPException(status_code=400, detail="Invite expired or already used")
+    
+    # Check if already member
+    existing = get_board_membership(board_id, current_user_id)
+    if existing:
+        raise HTTPException(status_code=400, detail="Already a board member")
+    
+    # Create membership
+    with db.transaction():
+        db.execute(
+            """INSERT INTO board_memberships 
+            (board_id, user_id, role, permissions, invited_by_user_id, invite_id, joined_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                board_id,
+                current_user_id,
+                invite['role'],
+                json.dumps(invite['permissions']),
+                invite['created_by_user_id'],
+                invite['id'],
+                datetime.utcnow().isoformat()
+            )
+        )
+        
+        # Increment invite usage
+        db.execute(
+            "UPDATE board_invites SET used_count = used_count + 1 WHERE id=?",
+            (invite['id'],)
+        )
+    
+    return {"message": "Successfully joined board", "role": invite['role']}
+
+
+@app.get("/boards/{board_id}/members", response_model=List[BoardMemberResponse])
+def list_board_members(
+    board_id: str,
+    current_user_id: int = Depends(get_current_user)
+):
+    """List all members of a board."""
+    # Check if user has permission to view members
+    if not check_board_permission(board_id, current_user_id, "view_board"):
+        raise HTTPException(status_code=403, detail="No permission to view board members")
+    
+    db = get_db()
+    rows = db.fetchall(
+        """SELECT m.id, m.user_id, m.role, m.permissions, m.joined_at,
+                  u.username, u.real_name
+           FROM board_memberships m
+           JOIN users u ON m.user_id = u.id
+           WHERE m.board_id = ?
+           ORDER BY m.joined_at DESC""",
+        (board_id,)
+    )
+    
+    import json
+    members = []
+    for row in rows:
+        permissions = json.loads(row['permissions']) if isinstance(row['permissions'], str) else row['permissions']
+        members.append(BoardMemberResponse(
+            id=row['id'],
+            user_id=row['user_id'],
+            username=row['username'],
+            real_name=row['real_name'],
+            role=row['role'],
+            permissions=permissions,
+            joined_at=safe_datetime(row['joined_at'])
+        ))
+    
+    return members
+
+
+@app.delete("/boards/{board_id}/members/{user_id}")
+def remove_board_member(
+    board_id: str,
+    user_id: int,
+    current_user_id: int = Depends(get_current_user)
+):
+    """Remove a member from a board."""
+    # Check if user has permission to manage members
+    if not check_board_permission(board_id, current_user_id, "manage_members"):
+        raise HTTPException(status_code=403, detail="No permission to manage members")
+    
+    # Prevent removing self if you're the only owner
+    if user_id == current_user_id:
+        db = get_db()
+        owner_count = db.fetchone(
+            "SELECT COUNT(*) as count FROM board_memberships WHERE board_id=? AND role='owner'",
+            (board_id,)
+        )
+        if owner_count['count'] <= 1:
+            raise HTTPException(status_code=400, detail="Cannot remove the only board owner")
+    
+    db = get_db()
+    # First check if member exists
+    existing = db.fetchone(
+        "SELECT user_id FROM board_memberships WHERE board_id=? AND user_id=?",
+        (board_id, user_id)
+    )
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="Member not found")
+    
+    # Delete the member
+    db.execute(
+        "DELETE FROM board_memberships WHERE board_id=? AND user_id=?",
+        (board_id, user_id)
+    )
+    db.commit()
+    
+    return {"message": "Member removed successfully"}
+
+
 @app.post("/users", response_model=models.User)
 def create_user(user: UserCreate):
     db = get_db()
@@ -281,14 +547,51 @@ def get_user(user_id: int):
     return get_user_by_id(user_id)
 
 
-@app.get("/me", response_model=models.User)
+class UserWithMembership(BaseModel):
+    """Extended user info including board membership."""
+    id: int
+    username: str
+    real_name: str
+    verified: bool
+    role: str
+    reputation: int
+    created_at: datetime
+    board_membership: Optional[Dict] = None
+    experience_balance: int = 0
+
+
+@app.get("/me", response_model=UserWithMembership)
 def get_current_user_info(current_user_id: int = Depends(get_current_user)):
-    """Get current authenticated user's information."""
-    return get_user_by_id(current_user_id)
+    """Get current authenticated user's information including board membership."""
+    user = get_user_by_id(current_user_id)
+    
+    # Get board membership for default board
+    board_id = "board_001"
+    membership = get_board_membership(board_id, current_user_id)
+    
+    # Get experience balance
+    experience_balance = get_user_experience(current_user_id)
+    
+    return UserWithMembership(
+        id=user.id,
+        username=user.username,
+        real_name=user.real_name,
+        verified=user.verified,
+        role=user.role,
+        reputation=user.reputation,
+        created_at=user.created_at,
+        board_membership=membership,
+        experience_balance=experience_balance
+    )
 
 
 @app.post("/quests", response_model=models.Quest)
 def create_quest(quest: QuestCreate, current_user_id: int = Depends(get_current_user)):
+    # Check if user has permission to create quests on the board
+    board_id = "board_001"  # Default board for MVP
+    if not check_board_permission(board_id, current_user_id, "create_quest"):
+        raise HTTPException(status_code=403, detail="No permission to create quests")
+    
     # Check if user has enough experience to create a quest
     user_xp = get_user_experience(current_user_id)
     if user_xp < QUEST_CREATION_COST:
@@ -324,6 +627,11 @@ def create_quest(quest: QuestCreate, current_user_id: int = Depends(get_current_
 
 @app.post("/quests/{quest_id}/claim", response_model=models.Quest)
 def claim_quest(quest_id: int, current_user_id: int = Depends(get_current_user)):
+    # Check if user has permission to claim quests
+    board_id = "board_001"  # Default board for MVP
+    if not check_board_permission(board_id, current_user_id, "claim_quest"):
+        raise HTTPException(status_code=403, detail="No permission to claim quests")
+    
     db = get_db()
     row = db.fetchone("SELECT status FROM quests WHERE id=?", (quest_id,))
     if row is None:
@@ -392,6 +700,11 @@ def submit_work(quest_id: int, current_user_id: int = Depends(get_current_user))
 
 @app.post("/quests/{quest_id}/verify", response_model=models.Quest)
 def verify_quest(quest_id: int, req: VerificationRequest, current_user_id: int = Depends(get_current_user)):
+    # Check if user has permission to verify quests
+    board_id = "board_001"  # Default board for MVP
+    if not check_board_permission(board_id, current_user_id, "verify_quest"):
+        raise HTTPException(status_code=403, detail="No permission to verify quests")
+    
     db = get_db()
     row = db.fetchone(
         "SELECT performer_id, status FROM quests WHERE id=?",

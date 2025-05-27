@@ -19,8 +19,11 @@ uvicorn src.board_mvp.web:app --reload
 python -m src.board_mvp.seed_tasks
 
 # 5. Test endpoints
-curl http://localhost:8000/health
+# Using Python urllib (preferred - no external dependencies)
+python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').read().decode())"
 # Should return: {"status":"healthy","database":"connected"}
+
+# Note: Use Python urllib instead of curl for all health checks and tests
 
 # 6. Open browser
 # Go to http://localhost:8000
@@ -202,7 +205,11 @@ export CIVICFORGE_SECRET_KEY=$(python -c "import secrets; print(secrets.token_he
 
 ## ✅ Success Indicators
 
-1. **Health check passes**: `curl http://localhost:8000/health` returns healthy
+1. **Health check passes**: 
+   ```python
+   python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').read().decode())"
+   ```
+   Returns healthy status
 2. **Can switch databases**: Set DATABASE_URL for PostgreSQL, unset for SQLite
 3. **All features work**: Registration, login, quest lifecycle, stats
 4. **No SQL errors**: Queries work on both databases

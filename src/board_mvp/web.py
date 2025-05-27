@@ -41,15 +41,17 @@ def safe_post(path: str, **kwargs):
     return requests.post(url, **kwargs)
 
 
-def base_html(content: str, token: Optional[str] = None) -> str:
+def base_html(content: str, token: Optional[str] = None, show_invites_link: bool = False) -> str:
     """Wrap content in base HTML with navigation."""
     nav_items = []
     if token:
         nav_items.extend([
             '<a href="/">Board</a>',
             '<a href="/stats">Stats</a>',
-            '<a href="/logout">Logout</a>'
         ])
+        if show_invites_link:
+            nav_items.append('<a href="/invites">Invites</a>')
+        nav_items.append('<a href="/logout">Logout</a>')
     else:
         nav_items.extend([
             '<a href="/login">Login</a>',
@@ -97,15 +99,21 @@ def index(request: Request, error: str = "", success: str = "", category: str = 
         return base_html("".join(content), token)
     
     # Get current user info
+    show_invites_link = False
     try:
         resp = safe_get("/me", headers=get_auth_header(token))
         if resp.status_code != 200:
             return RedirectResponse("/login?error=Session expired", status_code=303)
         current_user = resp.json()
 
-        # Get user's XP balance
-        xp_resp = safe_get(f"/users/{current_user['id']}/experience", headers=get_auth_header(token))
-        xp_balance = xp_resp.json().get("experience_balance", 0) if xp_resp.status_code == 200 else 0
+        # Get user's XP balance and membership info
+        xp_balance = current_user.get("experience_balance", 0)
+        
+        # Check if user has invite permissions
+        board_membership = current_user.get("board_membership")
+        if board_membership:
+            permissions = board_membership.get("permissions", {})
+            show_invites_link = permissions.get("create_invites", False) or permissions.get("manage_members", False)
 
         content.append(f"<p>Welcome, {current_user['username']}! You have {xp_balance} XP.</p>")
     except HTTPException:
@@ -200,7 +208,7 @@ def index(request: Request, error: str = "", success: str = "", category: str = 
         
         content.append("</div></div>")
     
-    return base_html("".join(content), token)
+    return base_html("".join(content), token, show_invites_link)
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -410,6 +418,19 @@ def stats_dashboard(token: Optional[str] = Cookie(None)):
     if not token:
         return RedirectResponse("/login?error=Please login first", status_code=303)
     
+    # Check for invite permissions
+    show_invites_link = False
+    try:
+        user_resp = safe_get("/me", headers=get_auth_header(token))
+        if user_resp.status_code == 200:
+            user_info = user_resp.json()
+            board_membership = user_info.get("board_membership")
+            if board_membership:
+                permissions = board_membership.get("permissions", {})
+                show_invites_link = permissions.get("create_invites", False) or permissions.get("manage_members", False)
+    except:
+        pass
+    
     # Get board stats
     stats_resp = safe_get(f"/stats/board", headers=get_auth_header(token))
     if stats_resp.status_code != 200:
@@ -448,4 +469,189 @@ def stats_dashboard(token: Optional[str] = Cookie(None)):
     content.append("<h2>Experience Statistics</h2>")
     content.append(f"<p>Total XP in Circulation: {stats['experience']['total_in_circulation']}</p>")
     
-    return base_html("".join(content), token)
+    return base_html("".join(content), token, show_invites_link)
+
+
+@app.get("/invites", response_class=HTMLResponse)
+def invite_management(token: Optional[str] = Cookie(None), error: str = "", success: str = ""):
+    """Display invite management page."""
+    if not token:
+        return RedirectResponse("/login?error=Please login first", status_code=303)
+    
+    # Get current user info with membership
+    user_resp = safe_get("/me", headers=get_auth_header(token))
+    if user_resp.status_code != 200:
+        return RedirectResponse("/?error=Failed to load user info", status_code=303)
+    
+    user_info = user_resp.json()
+    board_membership = user_info.get("board_membership")
+    
+    content = ["<h1>Invite Management</h1>"]
+    
+    if error:
+        content.append(f'<p class="error">{error}</p>')
+    if success:
+        content.append(f'<p class="success">{success}</p>')
+    
+    # Check if user has permission to create invites
+    can_create_invites = False
+    if board_membership:
+        permissions = board_membership.get("permissions", {})
+        can_create_invites = permissions.get("create_invites", False)
+    
+    if can_create_invites:
+        content.append("""
+        <h2>Create Invite</h2>
+        <form action="/create_invite" method="post">
+            <label>Role:
+                <select name="role">
+                    <option value="friend">Friend</option>
+                    <option value="reviewer">Reviewer</option>
+                    <option value="participant">Participant</option>
+                </select>
+            </label><br>
+            <label>Email (optional): <input type="email" name="email" placeholder="Optional"></label><br>
+            <label>Max Uses: <input type="number" name="max_uses" value="1" min="1"></label><br>
+            <label>Expires in (hours): <input type="number" name="expires_hours" value="48" min="1"></label><br>
+            <button type="submit">Create Invite</button>
+        </form>
+        """)
+        
+        # Get board members if user can manage them
+        if board_membership and board_membership.get("permissions", {}).get("manage_members", False):
+            members_resp = safe_get("/boards/board_001/members", headers=get_auth_header(token))
+            if members_resp.status_code == 200:
+                members = members_resp.json()
+                
+                content.append("<h2>Board Members</h2>")
+                content.append("<table border='1'>")
+                content.append("<tr><th>Username</th><th>Real Name</th><th>Role</th><th>Joined</th><th>Actions</th></tr>")
+                
+                for member in members:
+                    remove_button = ''
+                    if member['user_id'] != user_info['id']:
+                        remove_button = f'''<form action="/remove_member" method="post" style="display:inline;">
+                                <input type="hidden" name="user_id" value="{member["user_id"]}">
+                                <button type="submit" onclick="return confirm('Remove this member?')">Remove</button>
+                            </form>'''
+                    
+                    content.append(f"""
+                    <tr>
+                        <td>{member['username']}</td>
+                        <td>{member['real_name']}</td>
+                        <td>{member['role']}</td>
+                        <td>{member['joined_at'][:10]}</td>
+                        <td>{remove_button}</td>
+                    </tr>
+                    """)
+                
+                content.append("</table>")
+    else:
+        content.append("<p>You don't have permission to create invites.</p>")
+    
+    return base_html("".join(content), token, True)  # Always show invites link on invites page
+
+
+@app.post("/create_invite")
+def create_invite(
+    token: Optional[str] = Cookie(None),
+    role: str = Form(...),
+    email: Optional[str] = Form(None),
+    max_uses: int = Form(1),
+    expires_hours: int = Form(48)
+):
+    """Handle invite creation."""
+    if not token:
+        return RedirectResponse("/login?error=Please login first", status_code=303)
+    
+    resp = safe_post(
+        "/boards/board_001/invites",
+        json={
+            "board_id": "board_001",
+            "role": role,
+            "email": email if email else None,
+            "max_uses": max_uses,
+            "expires_hours": expires_hours
+        },
+        headers=get_auth_header(token)
+    )
+    
+    if resp.status_code == 200:
+        invite_data = resp.json()
+        success_msg = f"Invite created! Share this URL: {invite_data['invite_url']}"
+        return RedirectResponse(f"/invites?success={success_msg}", status_code=303)
+    else:
+        error_detail = resp.json().get("detail", "Failed to create invite")
+        return RedirectResponse(f"/invites?error={error_detail}", status_code=303)
+
+
+@app.post("/remove_member")
+def remove_member(
+    token: Optional[str] = Cookie(None),
+    user_id: int = Form(...)
+):
+    """Handle member removal."""
+    if not token:
+        return RedirectResponse("/login?error=Please login first", status_code=303)
+    
+    resp = requests.delete(
+        f"{API_BASE}/boards/board_001/members/{user_id}",
+        headers=get_auth_header(token)
+    )
+    
+    if resp.status_code == 200:
+        return RedirectResponse("/invites?success=Member removed successfully", status_code=303)
+    else:
+        error_detail = resp.json().get("detail", "Failed to remove member")
+        return RedirectResponse(f"/invites?error={error_detail}", status_code=303)
+
+
+@app.get("/board/{board_id}/join", response_class=HTMLResponse)
+def join_board_page(board_id: str, token: str, error: str = "", auth_token: Optional[str] = Cookie(None)):
+    """Display page for joining a board with an invite token."""
+    content = ["<h1>Join Board</h1>"]
+    
+    if error:
+        content.append(f'<p class="error">{error}</p>')
+    
+    if auth_token:
+        # User is logged in, show accept button
+        content.append(f"""
+        <p>You've been invited to join the board!</p>
+        <form action="/board/{board_id}/accept_invite" method="post">
+            <input type="hidden" name="invite_token" value="{token}">
+            <button type="submit">Accept Invitation</button>
+        </form>
+        """)
+    else:
+        # User needs to login first
+        content.append(f"""
+        <p>You've been invited to join the board!</p>
+        <p>Please <a href="/login?next=/board/{board_id}/join?token={token}">login</a> or 
+           <a href="/register?next=/board/{board_id}/join?token={token}">register</a> to accept this invitation.</p>
+        """)
+    
+    return base_html("".join(content), auth_token)
+
+
+@app.post("/board/{board_id}/accept_invite")
+def accept_invite(
+    board_id: str,
+    token: Optional[str] = Cookie(None),
+    invite_token: str = Form(...)
+):
+    """Handle accepting a board invite."""
+    if not token:
+        return RedirectResponse(f"/login?error=Please login first&next=/board/{board_id}/join?token={invite_token}", status_code=303)
+    
+    resp = safe_post(
+        f"/boards/{board_id}/join",
+        json={"token": invite_token},
+        headers=get_auth_header(token)
+    )
+    
+    if resp.status_code == 200:
+        return RedirectResponse("/?success=Successfully joined the board!", status_code=303)
+    else:
+        error_detail = resp.json().get("detail", "Failed to join board")
+        return RedirectResponse(f"/board/{board_id}/join?token={invite_token}&error={error_detail}", status_code=303)

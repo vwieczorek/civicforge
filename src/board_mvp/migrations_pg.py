@@ -1,6 +1,7 @@
 """Database migrations supporting both SQLite and PostgreSQL."""
 
 import os
+import json
 from datetime import datetime
 from .database import Database, get_db
 
@@ -65,6 +66,32 @@ CREATE TABLE IF NOT EXISTS board_config (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS board_invites (
+    id SERIAL PRIMARY KEY,
+    board_id VARCHAR(50) NOT NULL,
+    created_by_user_id INTEGER NOT NULL REFERENCES users(id),
+    invite_token VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255),
+    role VARCHAR(50) NOT NULL,
+    permissions JSONB NOT NULL,
+    max_uses INTEGER DEFAULT 1,
+    used_count INTEGER DEFAULT 0,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS board_memberships (
+    id SERIAL PRIMARY KEY,
+    board_id VARCHAR(50) NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    role VARCHAR(50) NOT NULL,
+    permissions JSONB NOT NULL,
+    invited_by_user_id INTEGER REFERENCES users(id),
+    invite_id INTEGER REFERENCES board_invites(id),
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(board_id, user_id)
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_quests_status ON quests(status);
 CREATE INDEX IF NOT EXISTS idx_quests_category ON quests(category);
@@ -73,6 +100,10 @@ CREATE INDEX IF NOT EXISTS idx_quests_performer ON quests(performer_id);
 CREATE INDEX IF NOT EXISTS idx_experience_user ON experience_ledger(user_id);
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_invites_token ON board_invites(invite_token);
+CREATE INDEX IF NOT EXISTS idx_invites_board ON board_invites(board_id);
+CREATE INDEX IF NOT EXISTS idx_memberships_board ON board_memberships(board_id);
+CREATE INDEX IF NOT EXISTS idx_memberships_user ON board_memberships(user_id);
 """
 
 # SQLite-compatible schema
@@ -141,6 +172,36 @@ CREATE TABLE IF NOT EXISTS board_config (
     xp_rates TEXT,
     created_at TIMESTAMP,
     updated_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS board_invites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board_id VARCHAR(50) NOT NULL,
+    created_by_user_id INTEGER NOT NULL,
+    invite_token VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255),
+    role VARCHAR(50) NOT NULL,
+    permissions TEXT NOT NULL,
+    max_uses INTEGER DEFAULT 1,
+    used_count INTEGER DEFAULT 0,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(created_by_user_id) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS board_memberships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    board_id VARCHAR(50) NOT NULL,
+    user_id INTEGER NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    permissions TEXT NOT NULL,
+    invited_by_user_id INTEGER,
+    invite_id INTEGER,
+    joined_at TEXT NOT NULL,
+    UNIQUE(board_id, user_id),
+    FOREIGN KEY(user_id) REFERENCES users(id),
+    FOREIGN KEY(invited_by_user_id) REFERENCES users(id),
+    FOREIGN KEY(invite_id) REFERENCES board_invites(id)
 );
 """
 
@@ -246,11 +307,49 @@ def run_migrations(db: Database = None):
             ))
     
     db.commit()
+    
+    # Add the first organizer user as board owner if no memberships exist
+    existing_memberships = db.fetchone("SELECT COUNT(*) as count FROM board_memberships")
+    if existing_memberships and existing_memberships['count'] == 0:
+        # Find the first organizer user
+        if is_postgres:
+            first_organizer = db.fetchone("""
+                SELECT id FROM users 
+                WHERE role = 'Organizer' 
+                ORDER BY created_at ASC 
+                LIMIT 1
+            """)
+        else:
+            first_organizer = db.fetchone("""
+                SELECT id FROM users 
+                WHERE role = 'Organizer' 
+                ORDER BY created_at ASC 
+                LIMIT 1
+            """)
+            
+        if first_organizer:
+            # Import ROLE_PERMISSIONS from auth module
+            from .auth import ROLE_PERMISSIONS
+            owner_perms = ROLE_PERMISSIONS['owner']
+            
+            if is_postgres:
+                db.execute("""
+                    INSERT INTO board_memberships (board_id, user_id, role, permissions)
+                    VALUES (%s, %s, %s, %s::jsonb)
+                """, ('board_001', first_organizer['id'], 'owner', json.dumps(owner_perms)))
+            else:
+                db.execute("""
+                    INSERT INTO board_memberships (board_id, user_id, role, permissions, joined_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, ('board_001', first_organizer['id'], 'owner', json.dumps(owner_perms), datetime.utcnow().isoformat()))
+            db.commit()
+            print(f"Added user {first_organizer['id']} as board owner")
+    
     print("Migrations complete!")
     
     # Show current schema summary
     print("\nDatabase initialized with tables:")
-    tables = ['users', 'quests', 'verifications', 'experience_ledger', 'board_config']
+    tables = ['users', 'quests', 'verifications', 'experience_ledger', 'board_config', 'board_invites', 'board_memberships']
     for table in tables:
         if is_postgres:
             result = db.fetchone(

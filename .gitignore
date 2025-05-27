@@ -1,5 +1,11 @@
-# Ignore generated ECS task definition to avoid committing deployment account info
+# Ignore generated ECS task definitions to avoid committing deployment account info
 deploy/aws/ecs-task-definition.json
+deploy/aws/ecs-task-definition-*.json
+!deploy/aws/ecs-task-definition.json.template
+
+# Deployment scripts with hardcoded values
+docker-entrypoint.sh
+verify_deployment.sh
 
 # Python
 __pycache__/

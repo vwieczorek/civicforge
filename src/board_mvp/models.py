@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict
 import sqlite3
 import os
 
@@ -56,6 +56,33 @@ class ExperienceEntry:
     entry_type: str
     quest_id: Optional[int]
     timestamp: datetime = datetime.utcnow()
+
+
+@dataclass
+class BoardInvite:
+    id: Optional[int]
+    board_id: str
+    created_by_user_id: int
+    invite_token: str
+    email: Optional[str]
+    role: str
+    permissions: Dict[str, bool]
+    max_uses: int = 1
+    used_count: int = 0
+    expires_at: datetime = None
+    created_at: datetime = datetime.utcnow()
+
+
+@dataclass
+class BoardMembership:
+    id: Optional[int]
+    board_id: str
+    user_id: int
+    role: str
+    permissions: Dict[str, bool]
+    invited_by_user_id: Optional[int]
+    invite_id: Optional[int]
+    joined_at: datetime = datetime.utcnow()
 
 
 SCHEMA_SQL = """
