@@ -51,6 +51,79 @@ class ThemeComponents:
     transition: str = "all 0.2s ease"
 
 @dataclass
+class RewardPoints:
+    """Point configuration for different task types."""
+    base_points: int = 10
+    completion_bonus: int = 5
+    quality_multiplier: float = 1.5
+    speed_bonus: int = 2
+    collaboration_bonus: int = 3
+    
+@dataclass
+class RewardDecay:
+    """Configuration for point decay over time."""
+    enabled: bool = False
+    rate_per_day: float = 0.01  # 1% per day
+    minimum_retained: float = 0.5  # Keep at least 50%
+    grace_period_days: int = 7  # No decay for first week
+    
+@dataclass
+class RewardBadges:
+    """Badge/achievement configuration."""
+    enabled: bool = True
+    milestone_badges: Dict[int, str] = field(default_factory=lambda: {
+        10: "Newcomer",
+        50: "Contributor", 
+        100: "Active Member",
+        500: "Community Leader",
+        1000: "Champion"
+    })
+    special_badges: Dict[str, str] = field(default_factory=lambda: {
+        "first_task": "Pioneer",
+        "streak_7": "Week Warrior",
+        "helper": "Helping Hand",
+        "quality": "Quality Champion"
+    })
+
+@dataclass
+class ThemeRewards:
+    """Complete rewards and incentives configuration."""
+    # Terminology
+    points_name: str = "Civic Points"
+    points_abbreviation: str = "CP"
+    experience_name: str = "Experience"
+    experience_abbreviation: str = "XP"
+    level_name: str = "Level"
+    quest_name: str = "Quest"
+    task_name: str = "Task"
+    
+    # Point system
+    point_system: RewardPoints = field(default_factory=RewardPoints)
+    decay_config: RewardDecay = field(default_factory=RewardDecay)
+    
+    # Task-specific rewards
+    task_rewards: Dict[str, int] = field(default_factory=lambda: {
+        "simple": 10,
+        "moderate": 25,
+        "complex": 50,
+        "critical": 100
+    })
+    
+    # Bonuses and multipliers
+    exceptional_multiplier: float = 2.0
+    team_multiplier: float = 1.2
+    streak_multiplier: float = 1.1
+    
+    # Visual indicators
+    show_points: bool = True
+    show_levels: bool = True
+    show_badges: bool = True
+    animated_rewards: bool = True
+    
+    # Badge configuration
+    badges: RewardBadges = field(default_factory=RewardBadges)
+
+@dataclass
 class Theme:
     """Complete theme definition for a CivicForge board."""
     id: str
@@ -62,6 +135,7 @@ class Theme:
     typography: ThemeTypography = field(default_factory=ThemeTypography)
     spacing: ThemeSpacing = field(default_factory=ThemeSpacing)
     components: ThemeComponents = field(default_factory=ThemeComponents)
+    rewards: ThemeRewards = field(default_factory=ThemeRewards)
     custom_css: str = ""
     preview_image: Optional[str] = None
     tags: List[str] = field(default_factory=list)
@@ -114,6 +188,31 @@ class Theme:
 
     def to_dict(self) -> dict:
         """Convert theme to dictionary for JSON serialization."""
+        rewards_dict = {
+            "points_name": self.rewards.points_name,
+            "points_abbreviation": self.rewards.points_abbreviation,
+            "experience_name": self.rewards.experience_name,
+            "experience_abbreviation": self.rewards.experience_abbreviation,
+            "level_name": self.rewards.level_name,
+            "quest_name": self.rewards.quest_name,
+            "task_name": self.rewards.task_name,
+            "point_system": self.rewards.point_system.__dict__,
+            "decay_config": self.rewards.decay_config.__dict__,
+            "task_rewards": self.rewards.task_rewards,
+            "exceptional_multiplier": self.rewards.exceptional_multiplier,
+            "team_multiplier": self.rewards.team_multiplier,
+            "streak_multiplier": self.rewards.streak_multiplier,
+            "show_points": self.rewards.show_points,
+            "show_levels": self.rewards.show_levels,
+            "show_badges": self.rewards.show_badges,
+            "animated_rewards": self.rewards.animated_rewards,
+            "badges": {
+                "enabled": self.rewards.badges.enabled,
+                "milestone_badges": self.rewards.badges.milestone_badges,
+                "special_badges": self.rewards.badges.special_badges
+            }
+        }
+        
         return {
             "id": self.id,
             "name": self.name,
@@ -124,6 +223,7 @@ class Theme:
             "typography": self.typography.__dict__,
             "spacing": self.spacing.__dict__,
             "components": self.components.__dict__,
+            "rewards": rewards_dict,
             "custom_css": self.custom_css,
             "preview_image": self.preview_image,
             "tags": self.tags,
@@ -153,6 +253,51 @@ class Theme:
         if "components" in data:
             theme.components = ThemeComponents(**data["components"])
         
+        if "rewards" in data:
+            rewards_data = data["rewards"]
+            theme.rewards = ThemeRewards()
+            
+            # Set basic terminology
+            for field in ["points_name", "points_abbreviation", "experience_name", 
+                         "experience_abbreviation", "level_name", "quest_name", "task_name"]:
+                if field in rewards_data:
+                    setattr(theme.rewards, field, rewards_data[field])
+            
+            # Set point system
+            if "point_system" in rewards_data:
+                theme.rewards.point_system = RewardPoints(**rewards_data["point_system"])
+            
+            # Set decay config
+            if "decay_config" in rewards_data:
+                theme.rewards.decay_config = RewardDecay(**rewards_data["decay_config"])
+            
+            # Set task rewards
+            if "task_rewards" in rewards_data:
+                theme.rewards.task_rewards = rewards_data["task_rewards"]
+            
+            # Set multipliers
+            for field in ["exceptional_multiplier", "team_multiplier", "streak_multiplier"]:
+                if field in rewards_data:
+                    setattr(theme.rewards, field, rewards_data[field])
+            
+            # Set visual indicators
+            for field in ["show_points", "show_levels", "show_badges", "animated_rewards"]:
+                if field in rewards_data:
+                    setattr(theme.rewards, field, rewards_data[field])
+            
+            # Set badges
+            if "badges" in rewards_data:
+                badges_data = rewards_data["badges"]
+                theme.rewards.badges = RewardBadges(
+                    enabled=badges_data.get("enabled", True),
+                    milestone_badges=badges_data.get("milestone_badges", 
+                        {10: "Newcomer", 50: "Contributor", 100: "Active Member", 
+                         500: "Community Leader", 1000: "Champion"}),
+                    special_badges=badges_data.get("special_badges",
+                        {"first_task": "Pioneer", "streak_7": "Week Warrior",
+                         "helper": "Helping Hand", "quality": "Quality Champion"})
+                )
+        
         theme.custom_css = data.get("custom_css", "")
         theme.preview_image = data.get("preview_image")
         theme.tags = data.get("tags", [])
@@ -169,7 +314,8 @@ THEMES = {
         name="CivicForge Default",
         description="Clean and modern default theme",
         author="CivicForge Team",
-        tags=["official", "modern", "clean"]
+        tags=["official", "modern", "clean"],
+        rewards=ThemeRewards()  # Uses default rewards
     ),
     
     "earth": Theme(
@@ -185,6 +331,43 @@ THEMES = {
             surface="#f0fdf4",
             text="#064e3b",
             text_secondary="#059669"
+        ),
+        rewards=ThemeRewards(
+            points_name="Green Points",
+            points_abbreviation="GP",
+            experience_name="Impact",
+            quest_name="Mission",
+            task_name="Action",
+            point_system=RewardPoints(
+                base_points=15,
+                completion_bonus=10,
+                quality_multiplier=2.0,
+                collaboration_bonus=5
+            ),
+            task_rewards={
+                "simple": 15,
+                "moderate": 40,
+                "complex": 80,
+                "critical": 150
+            },
+            exceptional_multiplier=2.5,
+            team_multiplier=1.5,
+            decay_config=RewardDecay(enabled=False),  # No decay for environmental actions
+            badges=RewardBadges(
+                milestone_badges={
+                    10: "Seedling",
+                    50: "Sapling",
+                    100: "Tree",
+                    500: "Forest Guardian",
+                    1000: "Earth Champion"
+                },
+                special_badges={
+                    "first_task": "First Step",
+                    "streak_7": "Weekly Warrior",
+                    "helper": "Community Grower",
+                    "quality": "Impact Leader"
+                }
+            )
         ),
         tags=["official", "nature", "environmental"]
     ),
@@ -238,6 +421,75 @@ THEMES = {
             text_secondary="#475569"
         ),
         tags=["official", "professional", "government"]
+    ),
+    
+    "gamified": Theme(
+        id="gamified",
+        name="Game On!",
+        description="Highly gamified theme with RPG-style rewards",
+        author="CivicForge Team",
+        colors=ThemeColors(
+            primary="#7c3aed",  # Purple
+            secondary="#f59e0b",  # Amber
+            accent="#ef4444",  # Red
+            background="#1a1a2e",
+            surface="#16213e",
+            text="#eee",
+            text_secondary="#aaa"
+        ),
+        rewards=ThemeRewards(
+            points_name="Experience Points",
+            points_abbreviation="XP",
+            experience_name="Power Level",
+            level_name="Rank",
+            quest_name="Epic Quest",
+            task_name="Challenge",
+            point_system=RewardPoints(
+                base_points=100,
+                completion_bonus=50,
+                quality_multiplier=3.0,
+                speed_bonus=25,
+                collaboration_bonus=30
+            ),
+            task_rewards={
+                "simple": 100,
+                "moderate": 250,
+                "complex": 500,
+                "critical": 1000
+            },
+            exceptional_multiplier=5.0,
+            team_multiplier=2.0,
+            streak_multiplier=1.5,
+            decay_config=RewardDecay(
+                enabled=True,
+                rate_per_day=0.02,  # 2% decay
+                minimum_retained=0.3,  # Keep 30%
+                grace_period_days=3  # 3 day grace period
+            ),
+            show_points=True,
+            show_levels=True,
+            show_badges=True,
+            animated_rewards=True,
+            badges=RewardBadges(
+                milestone_badges={
+                    100: "Novice",
+                    500: "Apprentice",
+                    1000: "Journeyman",
+                    5000: "Master",
+                    10000: "Grandmaster",
+                    50000: "Legend"
+                },
+                special_badges={
+                    "first_task": "Fresh Start",
+                    "streak_7": "Unstoppable",
+                    "streak_30": "Marathon Master",
+                    "helper": "Team Player",
+                    "quality": "Perfectionist",
+                    "speed": "Lightning Fast"
+                }
+            )
+        ),
+        tags=["official", "gamified", "fun", "dark"]
     )
 }
 

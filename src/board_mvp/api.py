@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import models
 from . import auth
 from .database import get_db, Database, init_db
+from .themes import theme_manager
 
 app = FastAPI(title="CivicForge Board MVP")
 
@@ -672,3 +673,36 @@ def health_check():
             raise HTTPException(status_code=503, detail="Database check failed")
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Health check failed: {str(e)}")
+
+
+# Theme API endpoints
+@app.get("/themes")
+def list_themes(tags: Optional[str] = None):
+    """List all available themes."""
+    tag_list = tags.split(",") if tags else None
+    themes = theme_manager.list_themes(tags=tag_list)
+    return {
+        "themes": [theme.to_dict() for theme in themes],
+        "count": len(themes)
+    }
+
+
+@app.get("/theme/{theme_id}")
+def get_theme(theme_id: str):
+    """Get a specific theme by ID."""
+    theme = theme_manager.get_theme(theme_id)
+    if not theme:
+        raise HTTPException(status_code=404, detail="Theme not found")
+    return theme.to_dict()
+
+
+@app.post("/theme", dependencies=[Depends(get_current_user)])
+def create_theme(theme_data: dict):
+    """Create or update a theme (requires authentication)."""
+    try:
+        from .themes import Theme
+        theme = Theme.from_dict(theme_data)
+        theme_manager.save_theme(theme)
+        return {"theme_id": theme.id, "message": "Theme saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid theme data: {str(e)}")
