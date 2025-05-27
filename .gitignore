@@ -41,3 +41,15 @@ htmlcov/
 .coverage.*
 coverage.xml
 *.cover
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Temporary test files
+test_aws_*.sh
+*_test_results.txt
+
+# Theme storage (if contains user data)
+themes/

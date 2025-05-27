@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from typing import Optional
 import json
 
-from .themes import Theme, ThemeColors, theme_manager
+from .themes import Theme, ThemeColors, ThemeRewards, RewardPoints, RewardDecay, RewardBadges, theme_manager
 from .web_themed import themed_html, get_auth_header, safe_get
 
 app = FastAPI(title="CivicForge Theme Editor")
@@ -118,6 +118,130 @@ def theme_editor(
                                 <option value="medium">Medium</option>
                                 <option value="strong">Strong</option>
                             </select>
+                        </div>
+                    </div>
+                    
+                    <div class="quest">
+                        <h3>Rewards & Incentives</h3>
+                        <p style="color: var(--color-text-secondary); margin-bottom: var(--spacing-medium);">
+                            Configure the rewards system independently from visual theme.
+                        </p>
+                        
+                        <h4>Terminology</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-small);">
+                            <div class="form-group">
+                                <label class="form-label">Points Name</label>
+                                <input name="points_name" value="Civic Points" placeholder="e.g., Points, Credits">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Points Abbreviation</label>
+                                <input name="points_abbreviation" value="CP" placeholder="e.g., CP, PTS">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Experience Name</label>
+                                <input name="experience_name" value="Experience" placeholder="e.g., Experience, Impact">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Experience Abbreviation</label>
+                                <input name="experience_abbreviation" value="XP" placeholder="e.g., XP, EXP">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Task Name</label>
+                                <input name="task_name" value="Task" placeholder="e.g., Task, Action, Challenge">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Quest Name</label>
+                                <input name="quest_name" value="Quest" placeholder="e.g., Quest, Mission, Project">
+                            </div>
+                        </div>
+                        
+                        <h4>Point System</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-small);">
+                            <div class="form-group">
+                                <label class="form-label">Base Points</label>
+                                <input type="number" name="base_points" value="10" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Completion Bonus</label>
+                                <input type="number" name="completion_bonus" value="5" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Quality Multiplier</label>
+                                <input type="number" name="quality_multiplier" value="1.5" step="0.1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Speed Bonus</label>
+                                <input type="number" name="speed_bonus" value="2" min="0">
+                            </div>
+                        </div>
+                        
+                        <h4>Task Rewards</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-small);">
+                            <div class="form-group">
+                                <label class="form-label">Simple Tasks</label>
+                                <input type="number" name="task_simple" value="10" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Moderate Tasks</label>
+                                <input type="number" name="task_moderate" value="25" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Complex Tasks</label>
+                                <input type="number" name="task_complex" value="50" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Critical Tasks</label>
+                                <input type="number" name="task_critical" value="100" min="1">
+                            </div>
+                        </div>
+                        
+                        <h4>Multipliers</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-small);">
+                            <div class="form-group">
+                                <label class="form-label">Exceptional Performance</label>
+                                <input type="number" name="exceptional_multiplier" value="2.0" step="0.1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Team Collaboration</label>
+                                <input type="number" name="team_multiplier" value="1.2" step="0.1" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Streak Bonus</label>
+                                <input type="number" name="streak_multiplier" value="1.1" step="0.1" min="1">
+                            </div>
+                        </div>
+                        
+                        <h4>Point Decay</h4>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" name="decay_enabled"> Enable point decay over time
+                            </label>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-small);">
+                            <div class="form-group">
+                                <label class="form-label">Decay Rate (% per day)</label>
+                                <input type="number" name="decay_rate" value="1" step="0.1" min="0" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Grace Period (days)</label>
+                                <input type="number" name="grace_period" value="7" min="0">
+                            </div>
+                        </div>
+                        
+                        <h4>Display Options</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-medium);">
+                            <label>
+                                <input type="checkbox" name="show_points" checked> Show points
+                            </label>
+                            <label>
+                                <input type="checkbox" name="show_levels" checked> Show levels
+                            </label>
+                            <label>
+                                <input type="checkbox" name="show_badges" checked> Show badges
+                            </label>
+                            <label>
+                                <input type="checkbox" name="animated_rewards" checked> Animated rewards
+                            </label>
                         </div>
                     </div>
                     
@@ -251,6 +375,38 @@ def theme_editor(
                     components: {
                         border_radius: formData.get('border_radius') + 'px'
                     },
+                    rewards: {
+                        points_name: formData.get('points_name'),
+                        points_abbreviation: formData.get('points_abbreviation'),
+                        experience_name: formData.get('experience_name'),
+                        experience_abbreviation: formData.get('experience_abbreviation'),
+                        task_name: formData.get('task_name'),
+                        quest_name: formData.get('quest_name'),
+                        point_system: {
+                            base_points: parseInt(formData.get('base_points')),
+                            completion_bonus: parseInt(formData.get('completion_bonus')),
+                            quality_multiplier: parseFloat(formData.get('quality_multiplier')),
+                            speed_bonus: parseInt(formData.get('speed_bonus'))
+                        },
+                        task_rewards: {
+                            simple: parseInt(formData.get('task_simple')),
+                            moderate: parseInt(formData.get('task_moderate')),
+                            complex: parseInt(formData.get('task_complex')),
+                            critical: parseInt(formData.get('task_critical'))
+                        },
+                        exceptional_multiplier: parseFloat(formData.get('exceptional_multiplier')),
+                        team_multiplier: parseFloat(formData.get('team_multiplier')),
+                        streak_multiplier: parseFloat(formData.get('streak_multiplier')),
+                        decay_config: {
+                            enabled: formData.get('decay_enabled') === 'on',
+                            rate_per_day: parseFloat(formData.get('decay_rate')) / 100,
+                            grace_period_days: parseInt(formData.get('grace_period'))
+                        },
+                        show_points: formData.get('show_points') === 'on',
+                        show_levels: formData.get('show_levels') === 'on',
+                        show_badges: formData.get('show_badges') === 'on',
+                        animated_rewards: formData.get('animated_rewards') === 'on'
+                    },
                     custom_css: formData.get('custom_css')
                 };
                 
@@ -316,6 +472,54 @@ def theme_editor(
                         medium: "1rem",
                         large: "1.5rem",
                         xlarge: "2rem"
+                    },
+                    rewards: {
+                        points_name: formData.get('points_name'),
+                        points_abbreviation: formData.get('points_abbreviation'),
+                        experience_name: formData.get('experience_name'),
+                        experience_abbreviation: formData.get('experience_abbreviation'),
+                        task_name: formData.get('task_name'),
+                        quest_name: formData.get('quest_name'),
+                        point_system: {
+                            base_points: parseInt(formData.get('base_points')),
+                            completion_bonus: parseInt(formData.get('completion_bonus')),
+                            quality_multiplier: parseFloat(formData.get('quality_multiplier')),
+                            speed_bonus: parseInt(formData.get('speed_bonus'))
+                        },
+                        task_rewards: {
+                            simple: parseInt(formData.get('task_simple')),
+                            moderate: parseInt(formData.get('task_moderate')),
+                            complex: parseInt(formData.get('task_complex')),
+                            critical: parseInt(formData.get('task_critical'))
+                        },
+                        exceptional_multiplier: parseFloat(formData.get('exceptional_multiplier')),
+                        team_multiplier: parseFloat(formData.get('team_multiplier')),
+                        streak_multiplier: parseFloat(formData.get('streak_multiplier')),
+                        decay_config: {
+                            enabled: formData.get('decay_enabled') === 'on',
+                            rate_per_day: parseFloat(formData.get('decay_rate')) / 100,
+                            grace_period_days: parseInt(formData.get('grace_period'))
+                        },
+                        show_points: formData.get('show_points') === 'on',
+                        show_levels: formData.get('show_levels') === 'on',
+                        show_badges: formData.get('show_badges') === 'on',
+                        animated_rewards: formData.get('animated_rewards') === 'on',
+                        badges: {
+                            enabled: true,
+                            milestone_badges: {
+                                10: "Newcomer",
+                                50: "Contributor",
+                                100: "Active Member",
+                                500: "Community Leader",
+                                1000: "Champion"
+                            },
+                            special_badges: {
+                                first_task: "Pioneer",
+                                streak_7: "Week Warrior",
+                                helper: "Helping Hand",
+                                quality: "Quality Champion"
+                            }
+                        }
                     },
                     custom_css: formData.get('custom_css')
                 };
