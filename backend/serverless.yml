@@ -1,0 +1,79 @@
+service: civicforge-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  
+  environment:
+    COGNITO_REGION: ${self:provider.region}
+    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
+    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
+    USERS_TABLE: ${self:custom.usersTable}
+    QUESTS_TABLE: ${self:custom.questsTable}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:Query
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.questsTable}"
+
+custom:
+  usersTable: civicforge-${self:provider.stage}-users
+  questsTable: civicforge-${self:provider.stage}-quests
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+  serverless-offline:
+    httpPort: 3001
+
+functions:
+  api:
+    handler: handler.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: ANY
+
+plugins:
+  - serverless-python-requirements
+  - serverless-offline
+
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.usersTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+    
+    QuestsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.questsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: questId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: questId
+            KeyType: HASH
