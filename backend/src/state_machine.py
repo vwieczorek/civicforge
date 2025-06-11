@@ -49,7 +49,7 @@ class QuestStateMachine:
         # Validate based on transition type
         if transition_type == "claim":
             if user_id == quest.creatorId:
-                return False, "Cannot claim your own quest"
+                return False, "cannot claim their own quest"
             if quest.performerId is not None:
                 return False, "Quest already claimed"
                 
@@ -80,3 +80,91 @@ class QuestStateMachine:
         
         roles = {a.role for a in quest.attestations}
         return "requestor" in roles and "performer" in roles
+    
+    @staticmethod
+    def _is_requestor(quest: Quest, user_id: str) -> bool:
+        """Check if user is the quest requestor (creator)"""
+        return quest.creatorId == user_id
+    
+    @staticmethod
+    def _is_performer(quest: Quest, user_id: str) -> bool:
+        """Check if user is the quest performer"""
+        return quest.performerId == user_id
+    
+    @staticmethod
+    def can_user_attest(quest: Quest, user_id: str) -> bool:
+        """
+        Check if user can attest to this quest.
+        Enforces state, role, and idempotency requirements.
+        """
+        # 1. State Check: Must be in SUBMITTED state to accept attestations
+        if quest.status != QuestStatus.SUBMITTED:
+            return False
+        
+        # 2. Role Check: User must be a participant (requestor or performer)
+        is_participant = (
+            QuestStateMachine._is_requestor(quest, user_id) or 
+            QuestStateMachine._is_performer(quest, user_id)
+        )
+        if not is_participant:
+            return False
+        
+        # 3. Idempotency Check: User must not have already attested
+        if any(att.user_id == user_id for att in quest.attestations):
+            return False
+        
+        return True
+    
+    @staticmethod
+    def is_ready_for_completion(quest: Quest) -> bool:
+        """
+        Check if quest is ready for completion.
+        Requires dual attestation from both parties.
+        """
+        return (
+            quest.status == QuestStatus.SUBMITTED and
+            QuestStateMachine._has_dual_attestation(quest)
+        )
+    
+    @staticmethod
+    def can_user_claim(quest: Quest, user_id: str) -> bool:
+        """Check if user can claim this quest"""
+        if quest.status != QuestStatus.OPEN:
+            return False
+        
+        if QuestStateMachine._is_requestor(quest, user_id):
+            return False  # Cannot claim own quest
+        
+        if quest.performerId is not None:
+            return False  # Already claimed
+        
+        return True
+    
+    @staticmethod
+    def can_user_submit(quest: Quest, user_id: str) -> bool:
+        """Check if user can submit work for this quest"""
+        if quest.status != QuestStatus.CLAIMED:
+            return False
+        
+        return QuestStateMachine._is_performer(quest, user_id)
+    
+    @staticmethod
+    def can_user_dispute(quest: Quest, user_id: str) -> bool:
+        """Check if user can dispute this quest"""
+        if quest.status != QuestStatus.SUBMITTED:
+            return False
+        
+        return (
+            QuestStateMachine._is_requestor(quest, user_id) or
+            QuestStateMachine._is_performer(quest, user_id)
+        )
+    
+    @staticmethod
+    def get_user_role(quest: Quest, user_id: str) -> Optional[str]:
+        """Get user's role in this quest"""
+        if QuestStateMachine._is_requestor(quest, user_id):
+            return "requestor"
+        elif QuestStateMachine._is_performer(quest, user_id):
+            return "performer"
+        else:
+            return None

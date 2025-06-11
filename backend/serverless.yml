@@ -8,12 +8,23 @@ provider:
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
   
+  httpApi:
+    throttle:
+      rateLimit: 100  # requests per second
+      burstLimit: 200  # burst capacity
+  
   environment:
     COGNITO_REGION: ${self:provider.region}
     COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
     COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
+    FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
+    FRONTEND_URL: ${ssm:/civicforge/${self:provider.stage}/frontend-url, 'http://localhost:3000'}
+    # Feature flags
+    FF_REWARD_DISTRIBUTION: ${env:FF_REWARD_DISTRIBUTION, 'false'}
+    FF_SIGNATURE_ATTESTATION: ${env:FF_SIGNATURE_ATTESTATION, 'true'}
+    FF_DISPUTE_RESOLUTION: ${env:FF_DISPUTE_RESOLUTION, 'false'}
   
   iam:
     role:
@@ -24,13 +35,16 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:Query
+            - dynamodb:Scan
           Resource:
             - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
             - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.questsTable}"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.failedRewardsTable}"
 
 custom:
   usersTable: civicforge-${self:provider.stage}-users
   questsTable: civicforge-${self:provider.stage}-quests
+  failedRewardsTable: civicforge-${self:provider.stage}-failed-rewards
   pythonRequirements:
     dockerizePip: true
     slim: true
@@ -47,6 +61,21 @@ functions:
       - httpApi:
           path: /
           method: ANY
+  
+  createUserTrigger:
+    handler: src.triggers.create_user.handler
+    memorySize: 128
+    timeout: 10
+    environment:
+      USERS_TABLE_NAME: ${self:custom.usersTable}
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - "dynamodb:PutItem"
+          - "dynamodb:GetItem"
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
+    onError: !GetAtt UserCreationDLQ.Arn
 
 plugins:
   - serverless-python-requirements
@@ -65,6 +94,8 @@ resources:
         KeySchema:
           - AttributeName: userId
             KeyType: HASH
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
     
     QuestsTable:
       Type: AWS::DynamoDB::Table
@@ -74,6 +105,135 @@ resources:
         AttributeDefinitions:
           - AttributeName: questId
             AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+          - AttributeName: creatorId
+            AttributeType: S
+          - AttributeName: performerId
+            AttributeType: S
         KeySchema:
           - AttributeName: questId
             KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: StatusIndex
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: CreatorIndex
+            KeySchema:
+              - AttributeName: creatorId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+          - IndexName: PerformerIndex
+            KeySchema:
+              - AttributeName: performerId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    
+    FailedRewardsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.failedRewardsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: failureId
+            AttributeType: S
+          - AttributeName: status
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: failureId
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: status-createdAt-index
+            KeySchema:
+              - AttributeName: status
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    
+    # Dead Letter Queue for failed user creation attempts
+    UserCreationDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-${self:provider.stage}-user-creation-dlq
+        MessageRetentionPeriod: 1209600  # 14 days
+        VisibilityTimeout: 60
+    
+    # CloudWatch Alarm for DLQ monitoring
+    UserCreationDLQAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-user-creation-failures
+        AlarmDescription: "Alert when user creation Lambda failures are queued in DLQ"
+        MetricName: ApproximateNumberOfMessagesVisible
+        Namespace: AWS/SQS
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 1
+        ComparisonOperator: GreaterThanOrEqualToThreshold
+        Dimensions:
+          - Name: QueueName
+            Value: !GetAtt UserCreationDLQ.QueueName
+        TreatMissingData: notBreaching
+    
+    # Lambda permission for Cognito to invoke the trigger
+    CreateUserTriggerLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt CreateUserTriggerLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}"
+    
+    # API Error Monitoring - Critical for production readiness
+    ApiLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}-api
+        RetentionInDays: 30
+    
+    ApiErrorMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      Properties:
+        LogGroupName: !Ref ApiLogGroup
+        FilterPattern: '{ $.level = "ERROR" }'
+        MetricTransformations:
+          - MetricName: ApiErrors
+            MetricNamespace: CivicForge/${self:provider.stage}
+            MetricValue: 1
+            DefaultValue: 0
+    
+    ApiErrorAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-errors
+        AlarmDescription: "Alert when API error rate exceeds threshold"
+        MetricName: ApiErrors
+        Namespace: CivicForge/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching

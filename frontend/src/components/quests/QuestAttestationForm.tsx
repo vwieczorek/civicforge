@@ -1,16 +1,37 @@
 import React from 'react';
 import { Quest, QuestStatus } from '../../api/types';
 import { api } from '../../api/client';
+import { QuestAttestationWithSignature } from './QuestAttestationWithSignature';
 
 interface Props {
-  quest: Quest;
-  currentUserId: string;
-  onAttested: () => void;
+  questId: string;
+  onSuccess?: () => void;
+  // Legacy props for compatibility
+  quest?: Quest;
+  currentUserId?: string;
+  onAttested?: () => void;
 }
 
-export function QuestAttestationForm({ quest, currentUserId, onAttested }: Props) {
+const QuestAttestationForm: React.FC<Props> = (props) => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [useSignature, setUseSignature] = React.useState(false);
+  const [questData, setQuestData] = React.useState<Quest | null>(props.quest || null);
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(props.currentUserId || null);
+
+  // Use new props if available, fallback to legacy
+  const questId = props.questId || props.quest?.questId;
+  const onComplete = props.onSuccess || props.onAttested;
+
+  React.useEffect(() => {
+    if (!props.quest && questId) {
+      // Fetch quest data if not provided
+      api.getQuest(questId).then(setQuestData).catch(console.error);
+    }
+  }, [questId, props.quest]);
+
+  const quest = questData;
+  if (!quest) return <div>Loading...</div>;
 
   // Determine user's role
   const isRequestor = quest.creatorId === currentUserId;
@@ -30,7 +51,21 @@ export function QuestAttestationForm({ quest, currentUserId, onAttested }: Props
     
     try {
       await api.attestQuest(quest.questId);
-      onAttested();
+      if (onComplete) onComplete();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to attest');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignedAttest = async (signature: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await api.attestQuest(quest.questId, signature);
+      if (onComplete) onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to attest');
     } finally {
@@ -89,15 +124,32 @@ export function QuestAttestationForm({ quest, currentUserId, onAttested }: Props
         </div>
       ) : canAttest && !hasUserAttested ? (
         <div className="attestation-action">
-          <p className="warning">
-            By attesting, you confirm that this quest has been completed according to the requirements.
-          </p>
-          <button 
-            onClick={handleAttest} 
-            disabled={loading}
-            className="attest-button"
+          {useSignature ? (
+            <QuestAttestationWithSignature
+              questId={quest.questId}
+              userId={currentUserId}
+              role={isRequestor ? 'requestor' : 'performer'}
+              onAttest={handleSignedAttest}
+            />
+          ) : (
+            <>
+              <p className="warning">
+                By attesting, you confirm that this quest has been completed according to the requirements.
+              </p>
+              <button 
+                onClick={handleAttest} 
+                disabled={loading}
+                className="attest-button"
+              >
+                {loading ? 'Attesting...' : 'Attest Completion'}
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setUseSignature(!useSignature)}
+            className="toggle-signature-button"
           >
-            {loading ? 'Attesting...' : 'Attest Completion'}
+            {useSignature ? 'Use Simple Attestation' : 'Use Cryptographic Attestation'}
           </button>
         </div>
       ) : hasUserAttested ? (
@@ -111,4 +163,6 @@ export function QuestAttestationForm({ quest, currentUserId, onAttested }: Props
       )}
     </div>
   );
-}
+};
+
+export default QuestAttestationForm;

@@ -5,17 +5,23 @@ JWT authentication with AWS Cognito
 import os
 import json
 from typing import Dict, Optional
-from functools import lru_cache
 import jwt
 from jwt.algorithms import RSAAlgorithm
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
+from cachetools import cached, TTLCache
 
 # Configuration
 COGNITO_REGION = os.environ.get("COGNITO_REGION", "us-east-1")
-COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "")
-COGNITO_APP_CLIENT_ID = os.environ.get("COGNITO_APP_CLIENT_ID", "")
+COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID")
+COGNITO_APP_CLIENT_ID = os.environ.get("COGNITO_APP_CLIENT_ID")
+
+# Validate required environment variables at startup
+if not COGNITO_USER_POOL_ID:
+    raise ValueError("Missing required environment variable: COGNITO_USER_POOL_ID")
+if not COGNITO_APP_CLIENT_ID:
+    raise ValueError("Missing required environment variable: COGNITO_APP_CLIENT_ID")
 
 # JWT validation
 COGNITO_ISSUER = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
@@ -24,10 +30,13 @@ JWKS_URL = f"{COGNITO_ISSUER}/.well-known/jwks.json"
 # Security scheme
 security = HTTPBearer()
 
+# Cache keys for 1 hour to handle key rotation
+cognito_keys_cache = TTLCache(maxsize=1, ttl=3600)
 
-@lru_cache()
+
+@cached(cognito_keys_cache)
 def get_cognito_keys() -> Dict:
-    """Fetch and cache Cognito public keys"""
+    """Fetch and cache Cognito public keys with TTL"""
     response = httpx.get(JWKS_URL)
     response.raise_for_status()
     return response.json()

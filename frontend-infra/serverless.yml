@@ -1,0 +1,123 @@
+service: civicforge-frontend-infra
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+
+resources:
+  Resources:
+    # Private S3 bucket for frontend assets
+    FrontendBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: civicforge-frontend-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        VersioningConfiguration:
+          Status: Enabled
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+
+    # Origin Access Control for secure CloudFront -> S3 access
+    OriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
+      Properties:
+        OriginAccessControlConfig:
+          Name: civicforge-frontend-oac-${self:provider.stage}
+          OriginAccessControlOriginType: s3
+          SigningBehavior: always
+          SigningProtocol: sigv4
+
+    # CloudFront distribution
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Origins:
+            - Id: S3Origin
+              DomainName: !GetAtt FrontendBucket.RegionalDomainName
+              S3OriginConfig:
+                OriginAccessIdentity: ''
+              OriginAccessControlId: !Ref OriginAccessControl
+          DefaultCacheBehavior:
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            ForwardedValues:
+              QueryString: false
+              Cookies:
+                Forward: none
+            DefaultTTL: 86400  # 1 day
+            MaxTTL: 31536000   # 1 year
+            MinTTL: 0
+          DefaultRootObject: index.html
+          # Enable SPA routing - redirect 404/403 to index.html
+          CustomErrorResponses:
+            - ErrorCode: 404
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+              ErrorCachingMinTTL: 300
+            - ErrorCode: 403
+              ResponseCode: 200
+              ResponsePagePath: /index.html
+              ErrorCachingMinTTL: 300
+          Enabled: true
+          Comment: CivicForge Frontend Distribution - ${self:provider.stage}
+          PriceClass: PriceClass_100  # Use only North America and Europe for cost optimization
+
+    # S3 bucket policy to allow CloudFront OAC access
+    FrontendBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref FrontendBucket
+        PolicyDocument:
+          Statement:
+            - Sid: AllowCloudFrontServicePrincipal
+              Effect: Allow
+              Principal:
+                Service: cloudfront.amazonaws.com
+              Action: s3:GetObject
+              Resource: !Sub '${FrontendBucket}/*'
+              Condition:
+                StringEquals:
+                  'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+
+  Outputs:
+    FrontendBucketName:
+      Description: Name of the S3 bucket for frontend assets
+      Value: !Ref FrontendBucket
+      Export:
+        Name: ${self:service}-${self:provider.stage}-bucket-name
+
+    CloudFrontDistributionId:
+      Description: CloudFront Distribution ID
+      Value: !Ref CloudFrontDistribution
+      Export:
+        Name: ${self:service}-${self:provider.stage}-distribution-id
+
+    CloudFrontDistributionDomainName:
+      Description: CloudFront Distribution Domain Name
+      Value: !GetAtt CloudFrontDistribution.DomainName
+      Export:
+        Name: ${self:service}-${self:provider.stage}-domain-name
+
+    FrontendUrl:
+      Description: Frontend URL (HTTPS)
+      Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+      Export:
+        Name: ${self:service}-${self:provider.stage}-frontend-url

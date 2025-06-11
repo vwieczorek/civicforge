@@ -1,8 +1,9 @@
 # civicforge-serverless
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
-![Coverage](https://img.shields.io/badge/coverage-85%25-green)
+![Coverage](https://img.shields.io/badge/coverage-30%25-orange)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+![Deployment](https://img.shields.io/badge/deployment-mvp_ready-green)
 
 **Enabling peer-to-peer trust through dual-attestation of community quests.**
 
@@ -29,18 +30,36 @@ This repository contains the serverless backend and frontend for CivicForge. It 
 # Clone and install
 git clone https://github.com/civicforge/civicforge-serverless
 cd civicforge-serverless
-pnpm install
+npm install
 
 # Configure environment
-cp .env.example .env
-# Edit .env with your AWS credentials
+cp frontend/.env.example frontend/.env
+# Edit frontend/.env with your Cognito configuration
 
 # Run locally
-pnpm run dev
+npm run dev
 
-# Frontend will be at http://localhost:3000
-# API will be at http://localhost:3001
+# Frontend will be at http://localhost:5173
+# API will be at http://localhost:3000/dev
 ```
+
+## Deployment Status: In Progress 🔄
+
+**✅ Core Architecture Implemented:**
+- Dual-attestation quest system with atomic operations
+- Secure CloudFront infrastructure with private S3
+- Centralized state machine authorization logic
+- Environment variable management with validation
+- Cryptographic signature verification
+
+**🚧 Critical Tasks Remaining:**
+- Backend test coverage: 48% → 70% target (integration test fixes needed)
+- Frontend test coverage: 7% → 60% target  
+- Production-grade XSS protection
+- CloudWatch monitoring implementation
+- Security audit completion
+
+**📋 Ready for Development/Testing** - Core functionality works but needs testing & security hardening before production deployment.
 
 ## Project Structure
 
