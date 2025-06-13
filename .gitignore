@@ -38,6 +38,9 @@ coverage/
 .coverage
 htmlcov/
 coverage.json
+playwright-report/
+test-results/
+test-results.json
 
 # AWS
 .aws-sam/
