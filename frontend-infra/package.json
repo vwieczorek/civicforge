@@ -1,0 +1,16 @@
+{
+  "name": "civicforge-frontend-infra",
+  "version": "1.0.0",
+  "description": "Infrastructure for CivicForge frontend hosting",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:dev": "serverless deploy --stage dev",
+    "deploy:staging": "serverless deploy --stage staging", 
+    "deploy:prod": "serverless deploy --stage prod",
+    "remove": "serverless remove",
+    "info": "serverless info"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0"
+  }
+}

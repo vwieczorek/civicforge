@@ -36,6 +36,8 @@ yarn-error.log*
 coverage/
 .pytest_cache/
 .coverage
+htmlcov/
+coverage.json
 
 # AWS
 .aws-sam/

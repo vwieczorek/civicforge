@@ -2,17 +2,22 @@
  * Minimal API client for dual-attestation operations
  */
 
-import { Auth } from 'aws-amplify';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { Quest } from './types';
+import { config } from '../config';
 
-const API_ENDPOINT = process.env.REACT_APP_API_ENDPOINT || '';
+const API_ENDPOINT = config.api.url;
 
 class ApiClient {
   private async getAuthHeader(): Promise<Record<string, string>> {
     try {
-      const session = await Auth.currentSession();
-      const token = session.getIdToken().getJwtToken();
-      return { Authorization: `Bearer ${token}` };
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+      
+      if (token) {
+        return { Authorization: `Bearer ${token}` };
+      }
+      return {};
     } catch {
       return {};
     }
@@ -42,6 +47,15 @@ class ApiClient {
     return response.json();
   }
 
+  // Generic methods for reuse
+  async get<T>(path: string): Promise<T> {
+    return this.request<T>('GET', path);
+  }
+
+  async post<T>(path: string, body?: any): Promise<T> {
+    return this.request<T>('POST', path, body);
+  }
+
   // Quest operations
   async getQuest(questId: string): Promise<Quest> {
     return this.request<Quest>('GET', `/api/v1/quests/${questId}`);
@@ -62,11 +76,11 @@ class ApiClient {
     );
   }
 
-  async attestQuest(questId: string, notes?: string): Promise<Quest> {
+  async attestQuest(questId: string, signature?: string, notes?: string): Promise<Quest> {
     return this.request<Quest>(
       'POST',
       `/api/v1/quests/${questId}/attest`,
-      { notes }
+      { signature, notes }
     );
   }
 
@@ -80,3 +94,4 @@ class ApiClient {
 }
 
 export const api = new ApiClient();
+export const apiClient = api; // alias for compatibility

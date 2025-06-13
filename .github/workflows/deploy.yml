@@ -1,0 +1,165 @@
+name: Deploy CivicForge
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: 'Deployment stage'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.stage || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio
+      
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  deploy-backend:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.stage || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-east-1
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Serverless Framework
+        run: npm install -g serverless
+      
+      - name: Deploy backend
+        working-directory: backend
+        run: |
+          npm install
+          STAGE=${{ github.event.inputs.stage || (github.ref == 'refs/heads/main' && 'prod' || 'staging') }}
+          serverless deploy --stage $STAGE
+
+  deploy-frontend:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.stage || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: us-east-1
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install and build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          STAGE=${{ github.event.inputs.stage || (github.ref == 'refs/heads/main' && 'prod' || 'staging') }}
+          
+          # Get configuration from SSM
+          export VITE_USER_POOL_ID=$(aws ssm get-parameter --name "/civicforge/$STAGE/cognito-user-pool-id" --query 'Parameter.Value' --output text)
+          export VITE_USER_POOL_CLIENT_ID=$(aws ssm get-parameter --name "/civicforge/$STAGE/cognito-app-client-id" --query 'Parameter.Value' --output text)
+          export VITE_AWS_REGION=us-east-1
+          
+          if [ "$STAGE" = "prod" ]; then
+            export VITE_API_URL=https://api.civicforge.com
+          elif [ "$STAGE" = "staging" ]; then
+            export VITE_API_URL=https://staging-api.civicforge.com
+          else
+            export VITE_API_URL=https://dev-api.civicforge.com
+          fi
+          
+          npm run build
+      
+      - name: Deploy to S3
+        working-directory: frontend
+        run: |
+          STAGE=${{ github.event.inputs.stage || (github.ref == 'refs/heads/main' && 'prod' || 'staging') }}
+          BUCKET_NAME="civicforge-frontend-$STAGE"
+          
+          # Create bucket if it doesn't exist
+          aws s3api create-bucket --bucket $BUCKET_NAME --region us-east-1 || true
+          
+          # Enable static website hosting
+          aws s3 website s3://$BUCKET_NAME/ --index-document index.html --error-document index.html
+          
+          # Upload files
+          aws s3 sync dist/ s3://$BUCKET_NAME/ --delete
+          
+          # Set bucket policy for public access
+          echo '{
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PublicReadGetObject",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::'$BUCKET_NAME'/*"
+              }
+            ]
+          }' > bucket-policy.json
+          
+          aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://bucket-policy.json
+          
+          echo "Frontend deployed to: http://$BUCKET_NAME.s3-website-us-east-1.amazonaws.com"
