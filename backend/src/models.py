@@ -55,6 +55,7 @@ class User(BaseModel):
     reputation: int = 0
     experience: int = 0
     questCreationPoints: int = 10  # Anti-spam: points for creating quests
+    processedRewardIds: Optional[List[str]] = None  # Track processed rewards for idempotency
     createdAt: datetime
     updatedAt: datetime
 
@@ -206,15 +207,19 @@ class ErrorResponse(BaseModel):
 
 
 class FailedReward(BaseModel):
-    """Track failed reward distributions for retry"""
-    failureId: str
+    """Track failed reward distributions for retry with idempotency"""
+    rewardId: str  # Primary key for the failed rewards table
     questId: str
     userId: str
-    xpAmount: int
-    reputationAmount: int
+    xpAmount: int = 0
+    reputationAmount: int = 0
+    questPointsAmount: int = 0
     errorMessage: str
-    attemptCount: int = 1
+    retryCount: int = 0
     status: Literal["pending", "retrying", "resolved", "abandoned"] = "pending"
+    leaseOwner: Optional[str] = None  # Lambda request ID that owns the lease
+    leaseExpiresAt: Optional[datetime] = None  # When the lease expires
     createdAt: datetime
     updatedAt: datetime
+    lastRetryAt: Optional[datetime] = None
     resolvedAt: Optional[datetime] = None

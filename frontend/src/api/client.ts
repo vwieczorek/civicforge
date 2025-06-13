@@ -2,7 +2,7 @@
  * Minimal API client for dual-attestation operations
  */
 
-import { Auth } from 'aws-amplify';
+import { fetchAuthSession } from 'aws-amplify/auth';
 import { Quest } from './types';
 import { config } from '../config';
 
@@ -11,9 +11,13 @@ const API_ENDPOINT = config.api.url;
 class ApiClient {
   private async getAuthHeader(): Promise<Record<string, string>> {
     try {
-      const session = await Auth.currentSession();
-      const token = session.getIdToken().getJwtToken();
-      return { Authorization: `Bearer ${token}` };
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+      
+      if (token) {
+        return { Authorization: `Bearer ${token}` };
+      }
+      return {};
     } catch {
       return {};
     }

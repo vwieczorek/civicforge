@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { Quest, QuestStatus } from '../api/types';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
+import { useErrorHandler } from '../hooks/useErrorHandler';
+import toast from 'react-hot-toast';
 
 const QuestCard: React.FC<{ quest: Quest }> = ({ quest }) => {
   const getStatusBadgeClass = (status: QuestStatus) => {
@@ -45,6 +48,7 @@ const QuestList: React.FC = () => {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { handleError } = useErrorHandler();
 
   useEffect(() => {
     fetchQuests();
@@ -53,13 +57,15 @@ const QuestList: React.FC = () => {
   const fetchQuests = async () => {
     try {
       setIsLoading(true);
-      // For now, we'll need to add this method to the API client
+      setError(null);
       const response = await apiClient.get<Quest[]>('/api/v1/quests');
       setQuests(response);
-      setError(null);
+      toast.success('Quests loaded successfully');
     } catch (err) {
-      console.error('Failed to fetch quests:', err);
-      setError('Failed to load quests. Please try again later.');
+      const errorMessage = handleError(err, {
+        fallbackMessage: 'Failed to load quests. Please try again later.'
+      });
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -67,8 +73,19 @@ const QuestList: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="loading-container">
-        <div className="spinner">Loading quests...</div>
+      <div className="quest-list-container">
+        <div className="page-header">
+          <h1>Available Quests</h1>
+          <p className="page-subtitle">
+            Discover opportunities to contribute and earn rewards through peer-verified tasks
+          </p>
+        </div>
+        <div className="quest-section">
+          <h2>Loading...</h2>
+          <div className="quest-grid">
+            <LoadingSkeleton variant="card" count={3} />
+          </div>
+        </div>
       </div>
     );
   }

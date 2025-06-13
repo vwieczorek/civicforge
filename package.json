@@ -30,6 +30,7 @@
   "devDependencies": {
     "concurrently": "^8.2.0",
     "serverless": "^3.35.0",
+    "serverless-iam-roles-per-function": "^3.2.0",
     "serverless-offline": "^13.2.0",
     "serverless-python-requirements": "^6.0.0"
   },

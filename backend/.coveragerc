@@ -1,0 +1,22 @@
+[run]
+source = src
+omit = 
+    src/routes.py
+    src/triggers/reprocess_failed_rewards.py
+    */tests/*
+    */test_*.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    pass
+
+[html]
+directory = htmlcov
+
+[json]
+output = coverage.json

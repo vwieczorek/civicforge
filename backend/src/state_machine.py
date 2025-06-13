@@ -4,7 +4,6 @@ Enforces business rules for the dual-attestation model
 """
 
 from typing import Dict, Tuple, Optional
-from datetime import datetime
 from .models import Quest, QuestStatus
 
 
@@ -162,6 +161,8 @@ class QuestStateMachine:
     @staticmethod
     def get_user_role(quest: Quest, user_id: str) -> Optional[str]:
         """Get user's role in this quest"""
+        if user_id is None:
+            return None
         if QuestStateMachine._is_requestor(quest, user_id):
             return "requestor"
         elif QuestStateMachine._is_performer(quest, user_id):

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Auth } from 'aws-amplify';
+import { getCurrentUser } from 'aws-amplify/auth';
 import { apiClient } from '../api/client';
 import { User, Quest, QuestStatus } from '../api/types';
 
@@ -24,8 +24,7 @@ const UserProfile: React.FC = () => {
       setIsLoading(true);
       
       // Get current user
-      const cognitoUser = await Auth.getCurrentUser();
-      const userId = cognitoUser.userId;
+      const { userId } = await getCurrentUser();
 
       // Fetch user profile data
       const profileData = await apiClient.get<UserProfileData>(`/api/v1/users/${userId}`);

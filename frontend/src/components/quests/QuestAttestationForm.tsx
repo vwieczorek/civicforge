@@ -1,7 +1,7 @@
 import React from 'react';
 import { Quest, QuestStatus } from '../../api/types';
 import { api } from '../../api/client';
-import { QuestAttestationWithSignature } from './QuestAttestationWithSignature';
+import QuestAttestationWithSignature from './QuestAttestationWithSignature';
 
 interface Props {
   questId: string;
@@ -17,7 +17,7 @@ const QuestAttestationForm: React.FC<Props> = (props) => {
   const [error, setError] = React.useState<string | null>(null);
   const [useSignature, setUseSignature] = React.useState(false);
   const [questData, setQuestData] = React.useState<Quest | null>(props.quest || null);
-  const [currentUserId, setCurrentUserId] = React.useState<string | null>(props.currentUserId || null);
+  const [currentUserId] = React.useState<string | null>(props.currentUserId || null);
 
   // Use new props if available, fallback to legacy
   const questId = props.questId || props.quest?.questId;

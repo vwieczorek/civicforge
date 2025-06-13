@@ -13,16 +13,25 @@ def check_coverage_report():
     
     # Critical modules that should never have 0% coverage
     CRITICAL_MODULES = [
-        'src/routes.py',
+        'src/routers/quests_actions.py',
+        'src/routers/quests_attest.py',
+        'src/routers/quests_create.py',
+        'src/routers/quests_delete.py',
+        'src/routers/quests_read.py',
+        'src/routers/system.py',
+        'src/routers/users.py',
         'src/auth.py', 
         'src/db.py'
     ]
     
     # Look for coverage report
-    coverage_file = 'htmlcov/status.json'
+    coverage_file = 'coverage.json'
     if not os.path.exists(coverage_file):
-        print("❌ No coverage report found. Run: pytest --cov=src --cov-report=html")
-        return False
+        # Try alternate location
+        coverage_file = 'htmlcov/status.json'
+        if not os.path.exists(coverage_file):
+            print("❌ No coverage report found. Run: pytest --cov=src --cov-report=json")
+            return False
     
     try:
         with open(coverage_file, 'r') as f:
@@ -33,13 +42,29 @@ def check_coverage_report():
     
     # Check for zero coverage in critical modules
     zero_coverage_modules = []
+    missing_modules = []
     
-    for file_path, file_data in coverage_data.get('files', {}).items():
+    files_data = coverage_data.get('files', {})
+    
+    # Check which critical modules are present in coverage report
+    for critical_module in CRITICAL_MODULES:
+        if critical_module not in files_data:
+            missing_modules.append(critical_module)
+    
+    # Check coverage for modules that are present
+    for file_path, file_data in files_data.items():
         if file_path in CRITICAL_MODULES:
             coverage_percent = file_data.get('summary', {}).get('percent_covered', 0)
             if coverage_percent == 0:
                 zero_coverage_modules.append(file_path)
     
+    if missing_modules:
+        print("🚨 CRITICAL: Some critical modules are not being tested at all!")
+        print("These modules are not even present in the coverage report:")
+        for module in missing_modules:
+            print(f"  - {module}")
+        print("\nThis means the test suite is not importing/executing these modules.")
+        
     if zero_coverage_modules:
         print("🚨 CRITICAL: Zero coverage detected in critical modules!")
         print("This usually means you're over-mocking and preventing code execution.")
@@ -47,11 +72,13 @@ def check_coverage_report():
         for module in zero_coverage_modules:
             print(f"  - {module}")
         
+    if missing_modules or zero_coverage_modules:
         print("\n💡 SOLUTION:")
         print("  1. Use integration tests with TestClient + moto")
         print("  2. Use app.dependency_overrides instead of @patch")
         print("  3. Let real code execute, only mock external services")
-        print("  4. See TESTING_GUIDELINES.md for examples")
+        print("  4. Ensure test fixtures include all routers")
+        print("  5. See TESTING_GUIDELINES.md for examples")
         
         return False
     
@@ -62,9 +89,12 @@ def check_coverage_report():
 def check_overall_coverage():
     """Check if overall coverage meets minimum threshold"""
     
-    coverage_file = 'htmlcov/status.json'
+    coverage_file = 'coverage.json'
     if not os.path.exists(coverage_file):
-        return True  # Skip if no report
+        # Try alternate location
+        coverage_file = 'htmlcov/status.json'
+        if not os.path.exists(coverage_file):
+            return True  # Skip if no report
     
     try:
         with open(coverage_file, 'r') as f:

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Auth } from 'aws-amplify';
+import { getCurrentUser } from 'aws-amplify/auth';
 import { apiClient } from '../api/client';
 import { Quest, QuestStatus } from '../api/types';
 import QuestAttestationForm from '../components/quests/QuestAttestationForm';
-import QuestAttestationWithSignature from '../components/quests/QuestAttestationWithSignature';
 import QuestAttestationDisplay from '../components/quests/QuestAttestationDisplay';
 
 const QuestDetail: React.FC = () => {
@@ -31,8 +30,8 @@ const QuestDetail: React.FC = () => {
 
       // Try to get current user ID
       try {
-        const user = await Auth.getCurrentUser();
-        setCurrentUserId(user.userId);
+        const { userId } = await getCurrentUser();
+        setCurrentUserId(userId);
       } catch {
         // User not authenticated, that's okay for viewing
         setCurrentUserId(null);
@@ -68,7 +67,7 @@ const QuestDetail: React.FC = () => {
 
     try {
       await apiClient.post(`/api/v1/quests/${questId}/submit`, {
-        submission: submissionText
+        submissionText: submissionText
       });
       await fetchQuestAndUser(); // Refresh quest data
     } catch (err) {

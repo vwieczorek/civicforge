@@ -1,0 +1,137 @@
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton-container {
+  width: 100%;
+}
+
+.skeleton-wrapper {
+  margin-bottom: 16px;
+}
+
+.skeleton-line {
+  display: inline-block;
+  height: 16px;
+  width: 100%;
+  background: #eee;
+  background-image: linear-gradient(
+    90deg,
+    #eee,
+    #f5f5f5,
+    #eee
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  border-radius: 4px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.skeleton-line.skeleton-title {
+  height: 24px;
+  width: 60%;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.skeleton-subtitle {
+  height: 16px;
+  width: 40%;
+  margin-bottom: 16px;
+}
+
+.skeleton-line.skeleton-short {
+  width: 80%;
+}
+
+.skeleton-line.skeleton-name {
+  height: 20px;
+  width: 150px;
+  margin-bottom: 8px;
+}
+
+.skeleton-line.skeleton-email {
+  height: 16px;
+  width: 200px;
+}
+
+/* Card skeleton */
+.skeleton-card {
+  background: white;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.skeleton-header {
+  margin-bottom: 16px;
+}
+
+.skeleton-body {
+  margin-bottom: 16px;
+}
+
+.skeleton-body .skeleton-line {
+  margin-bottom: 8px;
+}
+
+.skeleton-footer {
+  display: flex;
+  gap: 12px;
+}
+
+.skeleton-badge {
+  height: 24px;
+  width: 80px;
+  background: #eee;
+  background-image: linear-gradient(
+    90deg,
+    #eee,
+    #f5f5f5,
+    #eee
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  border-radius: 12px;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* List skeleton */
+.skeleton-list-item {
+  padding: 16px 0;
+  border-bottom: 1px solid #eee;
+}
+
+/* Profile skeleton */
+.skeleton-profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.skeleton-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #eee;
+  background-image: linear-gradient(
+    90deg,
+    #eee,
+    #f5f5f5,
+    #eee
+  );
+  background-size: 200px 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-profile-info {
+  flex: 1;
+}

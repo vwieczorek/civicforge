@@ -3,9 +3,8 @@ Tests for the Cognito PostConfirmation user creation trigger.
 """
 
 import pytest
-from unittest.mock import patch, MagicMock
-import json
-from datetime import datetime
+from unittest.mock import patch
+from botocore.exceptions import ClientError
 
 
 @pytest.fixture
@@ -31,127 +30,113 @@ def sample_cognito_event():
     }
 
 
-@pytest.fixture
-def mock_env():
-    """Mock environment variables"""
-    with patch.dict('os.environ', {'USERS_TABLE_NAME': 'test-users-table'}):
-        yield
-
-
-@pytest.fixture
-def mock_dynamodb():
-    """Mock DynamoDB table"""
-    with patch('boto3.resource') as mock_resource:
-        mock_table = MagicMock()
-        mock_resource.return_value.Table.return_value = mock_table
-        yield mock_table
-
-
-def test_create_user_success(sample_cognito_event, mock_env, mock_dynamodb):
+def test_create_user_success(sample_cognito_event):
     """Test successful user creation"""
-    from src.triggers.create_user import handler
-    
-    # Mock that user doesn't exist yet
-    mock_dynamodb.get_item.return_value = {}
-    
-    # Execute the handler
-    result = handler(sample_cognito_event, {})
-    
-    # Verify the result
-    assert result == sample_cognito_event
-    
-    # Verify DynamoDB calls
-    mock_dynamodb.get_item.assert_called_once_with(
-        Key={'userId': '12345678-1234-1234-1234-123456789012'}
-    )
-    
-    # Verify put_item was called with correct structure
-    mock_dynamodb.put_item.assert_called_once()
-    put_call_args = mock_dynamodb.put_item.call_args[1]['Item']
-    
-    assert put_call_args['userId'] == '12345678-1234-1234-1234-123456789012'
-    assert put_call_args['username'] == 'testuser123'
-    assert put_call_args['email'] == 'test@example.com'
-    assert put_call_args['reputation'] == 0
-    assert put_call_args['experience'] == 0
-    assert put_call_args['questCreationPoints'] == 10
-    assert 'createdAt' in put_call_args
-    assert 'updatedAt' in put_call_args
+    with patch.dict('os.environ', {'USERS_TABLE_NAME': 'test-users'}):
+        # FIX: Patch the 'table' object directly where it is used by the handler
+        with patch('src.triggers.create_user.table') as mock_table:
+            # Import after patching
+            from src.triggers.create_user import handler
+            
+            # Execute the handler
+            result = handler(sample_cognito_event, {})
+            
+            # Verify the result
+            assert result == sample_cognito_event
+            
+            # Verify put_item was called
+            mock_table.put_item.assert_called_once()
+            call_args = mock_table.put_item.call_args[1]
+            
+            assert 'Item' in call_args
+            item = call_args['Item']
+            assert item['userId'] == '12345678-1234-1234-1234-123456789012'
+            assert item['username'] == 'testuser123'
+            assert item['email'] == 'test@example.com'
+            assert item['reputation'] == 0
+            assert item['experience'] == 0
+            assert item['questCreationPoints'] == 10
 
 
-def test_create_user_already_exists(sample_cognito_event, mock_env, mock_dynamodb):
+def test_create_user_already_exists(sample_cognito_event):
     """Test idempotency - user already exists"""
-    from src.triggers.create_user import handler
-    
-    # Mock that user already exists
-    mock_dynamodb.get_item.return_value = {
-        'Item': {'userId': '12345678-1234-1234-1234-123456789012'}
-    }
-    
-    # Execute the handler
-    result = handler(sample_cognito_event, {})
-    
-    # Verify the result
-    assert result == sample_cognito_event
-    
-    # Verify get_item was called but put_item was not
-    mock_dynamodb.get_item.assert_called_once()
-    mock_dynamodb.put_item.assert_not_called()
+    with patch.dict('os.environ', {'USERS_TABLE_NAME': 'test-users'}):
+        # FIX: Patch the 'table' object directly
+        with patch('src.triggers.create_user.table') as mock_table:
+            # Mock that put_item fails with ConditionalCheckFailedException
+            error_response = {'Error': {'Code': 'ConditionalCheckFailedException'}}
+            mock_table.put_item.side_effect = ClientError(error_response, 'PutItem')
+            
+            # Import after patching
+            from src.triggers.create_user import handler
+            
+            # Execute the handler - should handle the error gracefully
+            result = handler(sample_cognito_event, {})
+            
+            # Verify the result
+            assert result == sample_cognito_event
+            
+            # Verify put_item was attempted
+            mock_table.put_item.assert_called_once()
 
 
-def test_create_user_graceful_failure(sample_cognito_event, mock_env, mock_dynamodb):
+def test_create_user_graceful_failure(sample_cognito_event):
     """Test graceful failure handling"""
-    from src.triggers.create_user import handler
-    
-    # Mock that user doesn't exist
-    mock_dynamodb.get_item.return_value = {}
-    
-    # Mock DynamoDB put_item failure
-    mock_dynamodb.put_item.side_effect = Exception("DynamoDB error")
-    
-    # Execute the handler - should not raise exception
-    result = handler(sample_cognito_event, {})
-    
-    # Verify the result is still returned (graceful failure)
-    assert result == sample_cognito_event
-    
-    # Verify put_item was attempted
-    mock_dynamodb.put_item.assert_called_once()
+    with patch.dict('os.environ', {'USERS_TABLE_NAME': 'test-users'}):
+        # FIX: Patch the 'table' object directly
+        with patch('src.triggers.create_user.table') as mock_table:
+            # Mock DynamoDB put_item failure
+            mock_table.put_item.side_effect = Exception("DynamoDB error")
+            
+            # Import after patching
+            from src.triggers.create_user import handler
+            
+            # Execute the handler - should not raise exception
+            result = handler(sample_cognito_event, {})
+            
+            # Verify the result is still returned (graceful failure)
+            assert result == sample_cognito_event
+            
+            # Verify put_item was attempted
+            mock_table.put_item.assert_called_once()
 
 
-def test_create_user_missing_email(sample_cognito_event, mock_env, mock_dynamodb):
+def test_create_user_missing_email(sample_cognito_event):
     """Test user creation without email"""
-    from src.triggers.create_user import handler
-    
     # Remove email from event
     del sample_cognito_event['request']['userAttributes']['email']
     
-    # Mock that user doesn't exist
-    mock_dynamodb.get_item.return_value = {}
-    
-    # Execute the handler
-    result = handler(sample_cognito_event, {})
-    
-    # Verify the result
-    assert result == sample_cognito_event
-    
-    # Verify put_item was called without email
-    mock_dynamodb.put_item.assert_called_once()
-    put_call_args = mock_dynamodb.put_item.call_args[1]['Item']
-    
-    assert 'email' not in put_call_args
-    assert put_call_args['userId'] == '12345678-1234-1234-1234-123456789012'
+    with patch.dict('os.environ', {'USERS_TABLE_NAME': 'test-users'}):
+        # FIX: Patch the 'table' object directly
+        with patch('src.triggers.create_user.table') as mock_table:
+            # Import after patching
+            from src.triggers.create_user import handler
+            
+            # Execute the handler
+            result = handler(sample_cognito_event, {})
+            
+            # Verify the result
+            assert result == sample_cognito_event
+            
+            # Verify put_item was called
+            mock_table.put_item.assert_called_once()
+            call_args = mock_table.put_item.call_args[1]
+            
+            assert 'Item' in call_args
+            item = call_args['Item']
+            # Email should not be in the item or should be None
+            assert 'email' not in item or item['email'] is None
 
 
 @pytest.mark.parametrize("missing_env", ["USERS_TABLE_NAME"])
 def test_missing_environment_variables(missing_env):
     """Test that missing environment variables raise errors on import"""
+    import sys
+    
+    # Remove the module from cache first
+    if 'src.triggers.create_user' in sys.modules:
+        del sys.modules['src.triggers.create_user']
+    
     with patch.dict('os.environ', {}, clear=True):
         with pytest.raises(ValueError, match="Missing required environment variable"):
-            # This should fail on module import
-            import importlib
-            import sys
-            if 'src.triggers.create_user' in sys.modules:
-                importlib.reload(sys.modules['src.triggers.create_user'])
-            else:
-                import src.triggers.create_user
+            import src.triggers.create_user

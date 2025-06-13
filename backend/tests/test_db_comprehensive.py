@@ -3,7 +3,6 @@ Comprehensive unit tests for db.py - testing database layer without AWS mocking
 Focus on serialization, validation, and business logic
 """
 
-import pytest
 from datetime import datetime
 from src.db import DynamoDBClient
 from src.models import Quest, QuestStatus, User, FailedReward, Attestation
@@ -281,23 +280,24 @@ def test_failed_reward_model_serialization():
     client = DynamoDBClient()
     
     failed_reward = FailedReward(
-        recordId="failure-123",
+        rewardId="reward-123",
         userId="user-456",
         questId="quest-789",
-        xp=100,
-        reputation=10,
-        error="DynamoDB timeout",
+        xpAmount=100,
+        reputationAmount=10,
+        errorMessage="DynamoDB timeout",
         status="pending",
         createdAt=datetime(2023, 1, 1),
+        updatedAt=datetime(2023, 1, 1),
         retryCount=2
     )
     
     reward_dict = failed_reward.model_dump()
     serialized = client._serialize_item(reward_dict)
     
-    assert serialized['recordId']['S'] == "failure-123"
+    assert serialized['rewardId']['S'] == "reward-123"
     assert serialized['userId']['S'] == "user-456"
-    assert serialized['xp']['N'] == "100"
+    assert serialized['xpAmount']['N'] == "100"
     assert serialized['retryCount']['N'] == "2"
     assert serialized['status']['S'] == "pending"
 

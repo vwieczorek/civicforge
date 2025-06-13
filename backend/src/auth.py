@@ -4,7 +4,7 @@ JWT authentication with AWS Cognito
 
 import os
 import json
-from typing import Dict, Optional
+from typing import Dict
 import jwt
 from jwt.algorithms import RSAAlgorithm
 from fastapi import HTTPException, Security, status
@@ -47,7 +47,12 @@ def verify_token(token: str) -> Dict:
     try:
         # Get the key ID from the token header
         unverified_header = jwt.get_unverified_header(token)
-        kid = unverified_header["kid"]
+        kid = unverified_header.get("kid")
+        if not kid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Key ID (kid) not found in token header"
+            )
         
         # Get the public key
         keys = get_cognito_keys()
@@ -103,7 +108,13 @@ async def get_current_user_id(
 ) -> str:
     """Get the current user's ID (Cognito sub)"""
     claims = await get_current_user_claims(credentials)
-    return claims["sub"]
+    user_id = claims.get("sub")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User identifier (sub) not found in token"
+        )
+    return user_id
 
 
 async def require_auth(

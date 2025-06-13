@@ -20,7 +20,7 @@ provider:
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
     FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
-    FRONTEND_URL: ${ssm:/civicforge/${self:provider.stage}/frontend-url, 'http://localhost:3000'}
+    FRONTEND_URL: ${ssm:/civicforge/${self:provider.stage}/frontend-url, 'http://localhost:5173'}
     # Feature flags
     FF_REWARD_DISTRIBUTION: ${env:FF_REWARD_DISTRIBUTION, 'false'}
     FF_SIGNATURE_ATTESTATION: ${env:FF_SIGNATURE_ATTESTATION, 'true'}
@@ -29,17 +29,13 @@ provider:
   iam:
     role:
       statements:
+        # Minimal default permissions for logging
         - Effect: Allow
           Action:
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:Query
-            - dynamodb:Scan
-          Resource:
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.questsTable}"
-            - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.failedRewardsTable}"
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*:*"
 
 custom:
   usersTable: civicforge-${self:provider.stage}-users
@@ -52,15 +48,171 @@ custom:
     httpPort: 3001
 
 functions:
+  # Main API handler - handles most operations except critical ones
   api:
-    handler: handler.handler
+    handler: handlers.api.handler
+    events:
+      # Health check and general routes
+      - httpApi:
+          path: /health
+          method: GET
+      - httpApi:
+          path: /api/v1/quests
+          method: GET
+      - httpApi:
+          path: /api/v1/quests/{quest_id}
+          method: GET
+      - httpApi:
+          path: /api/v1/quests/{quest_id}/claim
+          method: POST
+      - httpApi:
+          path: /api/v1/quests/{quest_id}/submit
+          method: POST
+      - httpApi:
+          path: /api/v1/quests/{quest_id}/dispute
+          method: POST
+      - httpApi:
+          path: /api/v1/users/{user_id}
+          method: GET
+      - httpApi:
+          path: /api/v1/users/wallet
+          method: PUT
+      - httpApi:
+          path: /api/v1/feature-flags
+          method: GET
+    iamRoleStatements:
+      # Read permissions
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:Query
+          - dynamodb:Scan
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}/index/*"
+      # Update permissions for quest operations
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+      # Restricted UpdateItem on UsersTable - only allow wallet address updates
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "walletAddress"
+              - "updatedAt"
+      # Explicitly DENY dangerous operations
+      - Effect: Deny
+        Action:
+          - dynamodb:DeleteItem
+        Resource: "*"
+  
+  # Critical operation: Create Quest (involves financial transaction)
+  createQuest:
+    handler: handlers.create_quest.handler
     events:
       - httpApi:
-          path: /{proxy+}
-          method: ANY
+          path: /api/v1/quests
+          method: POST
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+      # Restricted UpdateItem on UsersTable - only allow quest creation point deduction
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "questCreationPoints"
+              - "updatedAt"
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+  
+  # Critical operation: Attest Quest (involves rewards)
+  attestQuest:
+    handler: handlers.attest_quest.handler
+    events:
       - httpApi:
-          path: /
-          method: ANY
+          path: /api/v1/quests/{quest_id}/attest
+          method: POST
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+      # Separate GetItem for UsersTable (no attribute restriction needed for reads)
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+      # Restricted UpdateItem on UsersTable - only allow specific attributes
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "xp"
+              - "reputation"
+              - "questCreationPoints"
+              - "processedRewardIds"
+              - "updatedAt"
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.failedRewardsTable}"
+  
+  # Critical operation: Delete Quest (dangerous operation)
+  deleteQuest:
+    handler: handlers.delete_quest.handler
+    events:
+      - httpApi:
+          path: /api/v1/quests/{quest_id}
+          method: DELETE
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+      - Effect: Allow
+        Action:
+          - dynamodb:DeleteItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+      # Restricted UpdateItem on UsersTable - only allow quest point refund
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "questCreationPoints"
+              - "updatedAt"
   
   createUserTrigger:
     handler: src.triggers.create_user.handler
@@ -76,10 +228,52 @@ functions:
         Resource:
           - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
     onError: !GetAtt UserCreationDLQ.Arn
+  
+  # DLQ Re-processor for failed rewards
+  reprocessFailedRewards:
+    handler: src.triggers.reprocess_failed_rewards.handler
+    memorySize: 256
+    timeout: 60
+    events:
+      # Run every 15 minutes
+      - schedule: rate(15 minutes)
+    environment:
+      USERS_TABLE: ${self:custom.usersTable}
+      FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
+      MAX_RETRY_ATTEMPTS: 5
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.failedRewardsTable}"
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.failedRewardsTable}/index/status-createdAt-index"
+      # Read access to Users table
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+      # Restricted UpdateItem on UsersTable - only allow specific attributes
+      - Effect: Allow
+        Action:
+          - dynamodb:UpdateItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "xp"
+              - "reputation"
+              - "questCreationPoints"
+              - "processedRewardIds"
+              - "updatedAt"
 
 plugins:
   - serverless-python-requirements
   - serverless-offline
+  - serverless-iam-roles-per-function
 
 resources:
   Resources:

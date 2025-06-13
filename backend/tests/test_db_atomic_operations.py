@@ -8,7 +8,6 @@ from datetime import datetime
 from unittest.mock import patch, MagicMock, AsyncMock
 from botocore.exceptions import ClientError
 
-from src.models import QuestStatus
 
 
 # Tests for claim_quest_atomic

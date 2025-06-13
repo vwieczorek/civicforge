@@ -57,7 +57,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'username': username,
             'reputation': 0,
             'experience': 0,
-            'questCreationPoints': 10,  # Default from User model
+            'questCreationPoints': 10,  # Default initial points - should match settings.initial_quest_creation_points
             'createdAt': timestamp,
             'updatedAt': timestamp
         }

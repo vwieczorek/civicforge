@@ -18,10 +18,10 @@ const CreateQuest: React.FC = () => {
     rewardXp: 100,
     rewardReputation: 10,
   });
-  const [errors, setErrors] = useState<Partial<QuestFormData>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof QuestFormData, string>>>({});
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<QuestFormData> = {};
+    const newErrors: Partial<Record<keyof QuestFormData, string>> = {};
 
     if (!formData.title.trim()) {
       newErrors.title = 'Title is required';
@@ -72,7 +72,7 @@ const CreateQuest: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const response = await apiClient.post('/api/v1/quests', formData);
+      const response = await apiClient.post<{ questId: string }>('/api/v1/quests', formData);
       
       // Navigate to the newly created quest
       navigate(`/quests/${response.questId}`);
@@ -136,7 +136,7 @@ const CreateQuest: React.FC = () => {
               type="number"
               id="rewardXp"
               name="rewardXp"
-              value={formData.rewardXp}
+              value={formData.rewardXp.toString()}
               onChange={handleInputChange}
               min="10"
               max="10000"
@@ -153,7 +153,7 @@ const CreateQuest: React.FC = () => {
               type="number"
               id="rewardReputation"
               name="rewardReputation"
-              value={formData.rewardReputation}
+              value={formData.rewardReputation.toString()}
               onChange={handleInputChange}
               min="1"
               max="100"

@@ -24,14 +24,16 @@ cd ..
 
 # Frontend build test
 echo "📦 Testing frontend build..."
+
 cd frontend
 npm install
 npm run build
 
-if [ $? -eq 0 ]; then
-    echo "✅ Frontend build successful!"
+echo "📦 Running frontend tests..."
+if npm test; then
+    echo "✅ Frontend tests passed!"
 else
-    echo "❌ Frontend build failed!"
+    echo "❌ Frontend tests failed!"
     exit 1
 fi
 

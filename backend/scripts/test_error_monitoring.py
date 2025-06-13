@@ -5,7 +5,6 @@ This simulates various error conditions to ensure CloudWatch alarms trigger prop
 """
 
 import requests
-import json
 import sys
 import time
 from datetime import datetime
@@ -66,7 +65,7 @@ def test_error_monitoring(api_url: str):
                 print("   ✅ Test passed")
                 errors_generated += 1
             else:
-                print(f"   ❌ Unexpected status code")
+                print("   ❌ Unexpected status code")
                 print(f"   Response: {response.text}")
                 
         except Exception as e:
@@ -86,7 +85,7 @@ def test_error_monitoring(api_url: str):
         for i in range(5 - errors_generated):
             try:
                 requests.get(f"{api_url}/api/v1/trigger/error/{i}")
-            except:
+            except Exception:
                 pass
             time.sleep(0.5)
         

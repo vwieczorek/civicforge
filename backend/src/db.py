@@ -5,13 +5,11 @@ DynamoDB client for quest and user operations
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 
-import aiobotocore
 from aiobotocore.session import get_session
-from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from .models import Quest, QuestDB, User, FailedReward, QuestStatus
@@ -28,27 +26,35 @@ class DynamoDBClient:
         self.users_table_name = os.environ.get("USERS_TABLE", "civicforge-users")
         self.quests_table_name = os.environ.get("QUESTS_TABLE", "civicforge-quests")
         self.failed_rewards_table_name = os.environ.get('FAILED_REWARDS_TABLE')
-        self._session = get_session()
+        self._session = None
         self._client = None
     
     @asynccontextmanager
     async def get_resource(self):
         """Get async DynamoDB client with lifecycle management"""
-        if self._client is None:
-            # Support endpoint_url for testing
-            endpoint_url = os.environ.get('DYNAMODB_ENDPOINT_URL')
-            kwargs = {}
-            if endpoint_url:
-                kwargs['endpoint_url'] = endpoint_url
-            self._client = await self._session.create_client('dynamodb', **kwargs).__aenter__()
+        if self._session is None:
+            self._session = get_session()
         
-        yield self._client
+        endpoint_url = os.environ.get('DYNAMODB_ENDPOINT_URL')
+        kwargs = {
+            'region_name': os.environ.get('AWS_REGION', 'us-east-1'),
+            'aws_access_key_id': os.environ.get('AWS_ACCESS_KEY_ID', 'testing'),
+            'aws_secret_access_key': os.environ.get('AWS_SECRET_ACCESS_KEY', 'testing')
+        }
+        if endpoint_url:
+            kwargs['endpoint_url'] = endpoint_url
+        
+        # Create a new client for each use. This is the correct pattern for
+        # ensuring the client is tied to the active event loop, fixing the
+        # "Event loop is closed" error in tests.
+        async with self._session.create_client('dynamodb', **kwargs) as client:
+            yield client
     
     async def close(self):
         """Close the DynamoDB client"""
-        if self._client:
-            await self._client.__aexit__(None, None, None)
-            self._client = None
+        # Client lifecycle is now managed by the 'async with' block in get_resource.
+        # This method can be a no-op or simply clear the session.
+        self._session = None
     
     async def get_user(self, user_id: str) -> Optional[User]:
         """Get user by ID"""
@@ -68,7 +74,7 @@ class DynamoDBClient:
             logger.error(f"Error getting user {user_id}: {e}")
             return None
     
-    async def get_quest(self, quest_id: str) -> Optional[Quest]:
+    async def get_quest(self, quest_id: str) -> Optional[QuestDB]:
         """Get quest by ID"""
         try:
             async with self.get_resource() as dynamodb:
@@ -78,7 +84,7 @@ class DynamoDBClient:
                 )
             if 'Item' in response:
                 item = self._deserialize_item(response['Item'])
-                return Quest(**item)
+                return QuestDB(**item)
             return None
         except ClientError as e:
             logger.error(f"Error getting quest {quest_id}: {e}")
@@ -154,7 +160,7 @@ class DynamoDBClient:
                 )
             if 'Item' in response:
                 item = self._deserialize_item(response['Item'])
-                return Quest(**item)
+                return QuestDB(**item)
             return None
         except ClientError as e:
             logger.error(f"Error getting quest {quest_id} for update: {e}")
@@ -187,7 +193,7 @@ class DynamoDBClient:
                 await self.track_failed_reward(user_id, quest_id, xp, reputation, str(e))
             raise
     
-    async def deduct_quest_creation_points(self, user_id: str) -> bool:
+    async def deduct_quest_creation_points(self, user_id: str, points: int = 1) -> bool:
         """Deduct points for quest creation"""
         try:
             async with self.get_resource() as dynamodb:
@@ -197,7 +203,7 @@ class DynamoDBClient:
                     UpdateExpression="SET questCreationPoints = questCreationPoints - :points, updatedAt = :now",
                     ConditionExpression="questCreationPoints >= :points",
                     ExpressionAttributeValues={
-                        ':points': {'N': '1'},
+                        ':points': {'N': str(points)},
                         ':now': {'S': datetime.utcnow().isoformat()}
                     }
                 )
@@ -300,7 +306,7 @@ class DynamoDBClient:
         except ClientError as e:
             logger.error(f"Error tracking failed reward: {e}")
     
-    async def list_quests(self, status: Optional[str] = None) -> List[Quest]:
+    async def list_quests(self, status: Optional[str] = None) -> List[QuestDB]:
         """List all quests, optionally filtered by status"""
         try:
             items = []
@@ -343,7 +349,7 @@ class DynamoDBClient:
                     if not last_evaluated_key:
                         break
             
-            quests = [Quest(**item) for item in items]
+            quests = [QuestDB(**item) for item in items]
             
             # Sort by createdAt in descending order
             quests.sort(key=lambda q: q.createdAt, reverse=True)
@@ -354,7 +360,7 @@ class DynamoDBClient:
             logger.error(f"Error listing quests: {e}")
             raise
     
-    async def _list_quests_scan(self, status: Optional[str] = None) -> List[Quest]:
+    async def _list_quests_scan(self, status: Optional[str] = None) -> List[QuestDB]:
         """Fallback scan method for listing quests"""
         try:
             items = []
@@ -380,7 +386,7 @@ class DynamoDBClient:
                     if not last_evaluated_key:
                         break
             
-            quests = [Quest(**item) for item in items]
+            quests = [QuestDB(**item) for item in items]
             quests.sort(key=lambda q: q.createdAt, reverse=True)
             
             return quests
@@ -389,7 +395,7 @@ class DynamoDBClient:
             logger.error(f"Error scanning quests: {e}")
             raise
     
-    async def get_user_created_quests(self, user_id: str) -> List[Quest]:
+    async def get_user_created_quests(self, user_id: str) -> List[QuestDB]:
         """Get quests created by a user"""
         try:
             items = []
@@ -441,13 +447,13 @@ class DynamoDBClient:
                     else:
                         raise
             
-            return [Quest(**item) for item in items]
+            return [QuestDB(**item) for item in items]
             
         except ClientError as e:
             logger.error(f"Error getting user created quests: {e}")
             raise
     
-    async def get_user_performed_quests(self, user_id: str) -> List[Quest]:
+    async def get_user_performed_quests(self, user_id: str) -> List[QuestDB]:
         """Get quests performed by a user"""
         try:
             items = []
@@ -499,7 +505,7 @@ class DynamoDBClient:
                     else:
                         raise
             
-            return [Quest(**item) for item in items]
+            return [QuestDB(**item) for item in items]
             
         except ClientError as e:
             logger.error(f"Error getting user performed quests: {e}")
@@ -596,7 +602,7 @@ class DynamoDBClient:
                     TableName=self.quests_table_name,
                     Key={'questId': {'S': quest_id}},
                     UpdateExpression=f"SET attestations = list_append(if_not_exists(attestations, :empty_list), :new_attestation), {condition_field} = :true, updatedAt = :now ADD attesterIds :user_id_set",
-                    ConditionExpression=f"attribute_exists(questId) AND #status = :submitted_status AND {condition_field} = :false",
+                    ConditionExpression=f"attribute_exists(questId) AND #status = :submitted_status AND (attribute_not_exists(attesterIds) OR NOT contains(attesterIds, :user_id))",
                     ExpressionAttributeNames={
                         '#status': 'status'
                     },
@@ -604,8 +610,10 @@ class DynamoDBClient:
                         ':new_attestation': {'L': [self._serialize_value(attestation)]},
                         ':empty_list': {'L': []},
                         ':user_id_set': {'SS': [user_id]},
+                        ':user_id': {'S': user_id},
                         ':true': {'BOOL': True},
                         ':false': {'BOOL': False},
+                        ':null': {'NULL': True},
                         ':submitted_status': {'S': 'SUBMITTED'},
                         ':now': {'S': datetime.utcnow().isoformat()}
                     }
@@ -627,13 +635,14 @@ class DynamoDBClient:
                     TableName=self.quests_table_name,
                     Key={'questId': {'S': quest_id}},
                     UpdateExpression="SET performerId = :pid, #s = :claimed_status, claimedAt = :now, updatedAt = :now",
-                    ConditionExpression="#s = :open_status AND attribute_not_exists(performerId)",
+                    ConditionExpression="#s = :open_status AND (attribute_not_exists(performerId) OR performerId = :null)",
                     ExpressionAttributeNames={'#s': 'status'},
                     ExpressionAttributeValues={
                         ':pid': {'S': performer_id},
                         ':claimed_status': {'S': QuestStatus.CLAIMED.value},
                         ':open_status': {'S': QuestStatus.OPEN.value},
-                        ':now': {'S': datetime.utcnow().isoformat()}
+                        ':now': {'S': datetime.utcnow().isoformat()},
+                        ':null': {'NULL': True}
                     }
                 )
                 return True
@@ -678,11 +687,12 @@ class DynamoDBClient:
                     TableName=self.quests_table_name,
                     Key={'questId': {'S': quest_id}},
                     UpdateExpression="SET #S = :complete_status, completedAt = :now, updatedAt = :now",
-                    ConditionExpression="#S = :submitted_status",
+                    ConditionExpression="#S = :submitted_status AND hasRequestorAttestation = :true AND hasPerformerAttestation = :true",
                     ExpressionAttributeNames={'#S': 'status'},
                     ExpressionAttributeValues={
                         ':complete_status': {'S': QuestStatus.COMPLETE.value},
                         ':submitted_status': {'S': QuestStatus.SUBMITTED.value},
+                        ':true': {'BOOL': True},
                         ':now': {'S': datetime.utcnow().isoformat()}
                     }
                 )
@@ -756,6 +766,9 @@ class DynamoDBClient:
             return {'N': str(value)}
         elif isinstance(value, str):
             return {'S': value}
+        elif isinstance(value, (datetime, date)):
+            # Convert datetime/date to ISO format string
+            return {'S': value.isoformat()}
         elif isinstance(value, set):
             # Convert set to DynamoDB String Set
             return {'SS': list(value)}
@@ -800,4 +813,12 @@ class DynamoDBClient:
 
 
 # Create a singleton instance
+# Global singleton - will be replaced with dependency injection
 db_client = DynamoDBClient()
+
+def get_db_client() -> DynamoDBClient:
+    """
+    Dependency provider for DynamoDBClient.
+    Returns a new instance to ensure correct environment configuration in tests.
+    """
+    return DynamoDBClient()

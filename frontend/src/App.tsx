@@ -1,7 +1,8 @@
 import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { Amplify } from 'aws-amplify';
-import { Auth } from 'aws-amplify';
+import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { Toaster } from 'react-hot-toast';
 import { config } from './config';
 import './App.css';
 
@@ -27,7 +28,7 @@ const Header: React.FC = () => {
 
   const checkAuthState = async () => {
     try {
-      await Auth.getCurrentUser();
+      await getCurrentUser();
       setIsAuthenticated(true);
     } catch {
       setIsAuthenticated(false);
@@ -36,7 +37,7 @@ const Header: React.FC = () => {
 
   const handleSignOut = async () => {
     try {
-      await Auth.signOut();
+      await signOut();
       setIsAuthenticated(false);
       navigate('/');
     } catch (error) {
@@ -76,6 +77,26 @@ const App: React.FC = () => {
       <main className="main-content">
         <Outlet />
       </main>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
+            style: {
+              background: '#27ae60',
+            },
+          },
+          error: {
+            style: {
+              background: '#e74c3c',
+            },
+          },
+        }}
+      />
     </div>
   );
 };

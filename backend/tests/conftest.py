@@ -9,10 +9,8 @@ import asyncio
 import subprocess
 import time
 import httpx
-from typing import Generator, Optional
-import aiobotocore.session
 import socket
-from contextlib import closing
+from contextlib import closing, contextmanager
 
 # Set test environment variables before importing any modules
 os.environ["AWS_ACCESS_KEY_ID"] = "testing"
@@ -97,11 +95,14 @@ def moto_server():
             response = httpx.get(f"{endpoint_url}/")
             if response.status_code in [200, 404]:  # Moto might return either
                 break
-        except:
+        except Exception:
             time.sleep(0.5)
     else:
         proc.terminate()
         raise RuntimeError(f"Moto server failed to start on port {port}")
+    
+    # Set the endpoint URL for aiobotocore to use
+    os.environ["DYNAMODB_ENDPOINT_URL"] = endpoint_url
     
     yield endpoint_url
     
@@ -133,7 +134,7 @@ async def dynamodb_tables(moto_server):
         with users_table.batch_writer() as batch:
             for item in scan['Items']:
                 batch.delete_item(Key={'userId': item['userId']})
-    except:
+    except Exception:
         # Table doesn't exist, create it
         users_table = dynamodb.create_table(
             TableName='test-users',
@@ -152,7 +153,7 @@ async def dynamodb_tables(moto_server):
         with quests_table.batch_writer() as batch:
             for item in scan['Items']:
                 batch.delete_item(Key={'questId': item['questId']})
-    except:
+    except Exception:
         # Table doesn't exist, create it
         quests_table = dynamodb.create_table(
             TableName='test-quests',
@@ -187,7 +188,7 @@ async def dynamodb_tables(moto_server):
         with failed_rewards_table.batch_writer() as batch:
             for item in scan['Items']:
                 batch.delete_item(Key={'recordId': item['recordId']})
-    except:
+    except Exception:
         # Table doesn't exist, create it
         failed_rewards_table = dynamodb.create_table(
             TableName='test-failed-rewards',
@@ -200,22 +201,22 @@ async def dynamodb_tables(moto_server):
     # Seed test users
     users_table.put_item(Item={
         'userId': 'creator-123',
-        'email': 'creator@example.com',
         'username': 'creator',
         'experience': 1000,
         'reputation': 100,
         'questCreationPoints': 10,
+        'walletAddress': '0x1234567890123456789012345678901234567890',
         'createdAt': datetime.utcnow().isoformat(),
         'updatedAt': datetime.utcnow().isoformat()
     })
     
     users_table.put_item(Item={
         'userId': 'performer-456', 
-        'email': 'performer@example.com',
         'username': 'performer',
         'experience': 500,
         'reputation': 50,
         'questCreationPoints': 5,
+        'walletAddress': '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
         'createdAt': datetime.utcnow().isoformat(),
         'updatedAt': datetime.utcnow().isoformat()
     })
@@ -225,33 +226,88 @@ async def dynamodb_tables(moto_server):
 
 @pytest.fixture
 def client():
-    """Create test client"""
+    """Create test client with all routes included"""
     from fastapi.testclient import TestClient
-    from handler import app
-    from src.db import db_client
+    from src.app_factory import create_app
+    from src.db import db_client, DynamoDBClient
+    
+    # Create a test app with ALL routers to ensure complete test coverage
+    from src.routers.quests_read import router as quests_read_router
+    from src.routers.quests_create import router as quests_create_router
+    from src.routers.quests_actions import router as quests_actions_router
+    from src.routers.quests_attest import router as quests_attest_router
+    from src.routers.quests_delete import router as quests_delete_router
+    from src.routers.users import router as users_router
+    from src.routers.system import router as system_router
+    
+    app = create_app(
+        routers=[
+            quests_read_router,
+            quests_create_router,
+            quests_actions_router,
+            quests_attest_router,
+            quests_delete_router,
+            users_router,
+            system_router
+        ],
+        title="CivicForge API - Test Suite",
+        description="Complete test application with all routes"
+    )
+    
+    # Reset db_client before each test
+    db_client._client = None
+    db_client._session = None
+    
+    # Force db_client to re-read environment variables
+    # by recreating the singleton
+    import src.db
+    src.db.db_client = DynamoDBClient()
     
     yield TestClient(app)
     
     # Cleanup
     app.dependency_overrides.clear()
-    # Reset db_client between tests
+    # Reset db_client after each test
     if hasattr(db_client, '_client') and db_client._client:
-        # Can't await in sync fixture, so just mark for reset
         db_client._client = None
+    if hasattr(db_client, '_session') and db_client._session:
+        db_client._session = None
+
+
+# Note: authenticated_as is now created per-client in the authenticated_client fixture
+# This ensures it uses the correct app instance for each test
 
 
 @pytest.fixture
 def authenticated_client(client):
     """
-    Provides a client with dependency overrides for authentication.
-    Supports both specific users and custom user IDs.
+    Provides a client with an authentication helper.
+    Use with authenticated_as context manager for proper isolation.
     """
-    from handler import app
-    from src.auth import get_current_user_id, require_auth
+    # Get the app from the test client
+    app = client.app
     
-    # Store original overrides to restore them later
-    original_overrides = app.dependency_overrides.copy()
+    # Create a version of authenticated_as bound to this app
+    @contextmanager
+    def _authenticated_as(user_id: str):
+        from src.auth import get_current_user_id, require_auth
+        
+        # Store original overrides
+        original_overrides = app.dependency_overrides.copy()
+        
+        try:
+            # Apply overrides
+            app.dependency_overrides[get_current_user_id] = lambda: user_id
+            app.dependency_overrides[require_auth] = lambda: user_id
+            yield
+        finally:
+            # Restore original overrides
+            app.dependency_overrides = original_overrides
     
+    # Attach the context manager to the client for convenience
+    client.authenticated_as = _authenticated_as
+    
+    # Also provide the old factory interface for easier migration
     def _authenticated_client(user_id_key: str = None, custom_user_id: str = None):
         # Determine user ID
         if custom_user_id:
@@ -259,16 +315,44 @@ def authenticated_client(client):
         elif user_id_key == 'creator_id':
             user_id = 'creator-123'
         elif user_id_key == 'performer_id':
-            user_id = 'performer-456'
+            user_id = 'performer-456'  
+        elif user_id_key == 'performer1_id':
+            user_id = 'performer1-789'
+        elif user_id_key == 'performer2_id':
+            user_id = 'performer2-999'
+        elif user_id_key == 'unauthorized_id':
+            user_id = 'unauthorized-789'
         else:
             user_id = "test-user-123"  # Default test user
         
-        # Override both auth dependencies
-        app.dependency_overrides[get_current_user_id] = lambda: user_id
-        app.dependency_overrides[require_auth] = lambda: user_id
-        return client
+        # Create a wrapper that applies auth on each request
+        class AuthWrapper:
+            def __init__(self, client, user_id):
+                self.client = client
+                self.user_id = user_id
+                
+            def __getattr__(self, name):
+                # Pass through all attributes to the underlying client
+                attr = getattr(self.client, name)
+                if callable(attr) and name in ['get', 'post', 'put', 'delete', 'patch']:
+                    # Wrap HTTP methods to apply auth
+                    def wrapped(*args, **kwargs):
+                        with _authenticated_as(self.user_id):
+                            return attr(*args, **kwargs)
+                    return wrapped
+                return attr
+        
+        return AuthWrapper(client, user_id)
 
     yield _authenticated_client
+    
+    # Cleanup handled by authenticated_as context manager
+    # No need for aggressive clear() here
 
-    # Teardown: Restore original overrides to prevent side-effects
-    app.dependency_overrides = original_overrides
+@pytest.fixture
+def mock_feature_flags():
+    """Mock feature flags for tests"""
+    with patch('src.feature_flags.is_enabled') as mock:
+        # Enable all features by default in tests
+        mock.return_value = True
+        yield mock
