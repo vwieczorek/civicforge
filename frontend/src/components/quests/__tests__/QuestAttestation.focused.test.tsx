@@ -7,186 +7,272 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import QuestAttestationForm from '../QuestAttestationForm';
 import { createTestScenario } from '../../../test/mocks/factory';
-
-// Mock ethers for wallet signing
-const mockSignMessage = vi.fn();
-const mockGetSigner = vi.fn(() => ({ signMessage: mockSignMessage }));
-vi.mock('ethers', () => ({
-  BrowserProvider: vi.fn(() => ({ getSigner: mockGetSigner })),
-}));
-
-// Mock window.ethereum
-const mockEthereum = {
-  request: vi.fn(),
-};
-global.window = { ...global.window, ethereum: mockEthereum };
+import { api } from '../../../api/client';
+import { QuestStatus } from '../../../api/types';
 
 describe('Quest Attestation - Critical Flow', () => {
-  const { quest, attestationData } = createTestScenario('attestation');
-  const mockOnSubmit = vi.fn();
-  const mockOnCancel = vi.fn();
+  const mockOnSuccess = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset the API mocks
+    vi.spyOn(api, 'getQuest').mockClear();
+    vi.spyOn(api, 'attestQuest').mockClear();
   });
 
-  it('renders attestation form with quest information', () => {
+  it('renders attestation form with quest information', async () => {
+    const { quest, currentUser } = createTestScenario('attestation');
+    
+    // Mock the API call if component needs to fetch
+    vi.spyOn(api, 'getQuest').mockResolvedValue(quest);
+    
     render(
       <QuestAttestationForm
         questId={quest.questId}
-        questTitle={quest.title}
-        onSubmit={mockOnSubmit}
-        onCancel={mockOnCancel}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
       />
     );
 
-    expect(screen.getByText(/attest completion/i)).toBeInTheDocument();
-    expect(screen.getByText(quest.title)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /submit attestation/i })).toBeInTheDocument();
+    // The component should show the attestation form
+    expect(screen.getByText('Dual-Attestation Verification')).toBeInTheDocument();
+    expect(screen.getByText(/Both the requestor and performer must attest/i)).toBeInTheDocument();
+    
+    // Should show attestation progress
+    expect(screen.getByText('Attestation Progress')).toBeInTheDocument();
+    expect(screen.getByText('0 of 2 attestations')).toBeInTheDocument();
+    
+    // Should have the attest button for the current user (who is the creator/requestor)
+    expect(screen.getByRole('button', { name: /Attest Completion/i })).toBeInTheDocument();
   });
 
   it('allows attestation without wallet signature', async () => {
+    const { quest, currentUser } = createTestScenario('attestation');
     const user = userEvent.setup();
+    
+    // Mock successful attestation
+    vi.spyOn(api, 'attestQuest').mockResolvedValue(undefined);
     
     render(
       <QuestAttestationForm
         questId={quest.questId}
-        questTitle={quest.title}
-        onSubmit={mockOnSubmit}
-        onCancel={mockOnCancel}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
       />
     );
 
-    // Add optional notes
-    const notesInput = screen.getByPlaceholderText(/optional notes/i);
-    await user.type(notesInput, 'Good work!');
-
-    // Submit without signature
-    await user.click(screen.getByRole('button', { name: /submit attestation/i }));
+    // Click the attest button
+    const attestButton = screen.getByRole('button', { name: /Attest Completion/i });
+    await user.click(attestButton);
 
     await waitFor(() => {
-      expect(mockOnSubmit).toHaveBeenCalledWith({
-        signature: null,
-        notes: 'Good work!',
-      });
+      expect(api.attestQuest).toHaveBeenCalledWith(quest.questId);
+      expect(mockOnSuccess).toHaveBeenCalled();
     });
   });
 
-  it('handles wallet signature flow for on-chain attestation', async () => {
+  it('handles attestation errors gracefully', async () => {
+    const { quest, currentUser } = createTestScenario('attestation');
     const user = userEvent.setup();
     
-    // Setup successful wallet connection
-    mockEthereum.request.mockResolvedValueOnce(['0x742d35Cc6634C0532925a3b844Bc9e7595f62149']);
-    mockSignMessage.mockResolvedValueOnce(attestationData.signature);
-
-    render(
-      <QuestAttestationForm
-        questId={quest.questId}
-        questTitle={quest.title}
-        onSubmit={mockOnSubmit}
-        onCancel={mockOnCancel}
-      />
-    );
-
-    // Click sign with wallet
-    await user.click(screen.getByRole('button', { name: /sign with wallet/i }));
-
-    // Should request wallet connection
-    expect(mockEthereum.request).toHaveBeenCalledWith({ 
-      method: 'eth_requestAccounts' 
-    });
-
-    // Wait for signature
-    await waitFor(() => {
-      expect(mockSignMessage).toHaveBeenCalledWith(
-        expect.stringContaining(quest.questId)
-      );
-    });
-
-    // Submit with signature
-    await user.click(screen.getByRole('button', { name: /submit attestation/i }));
-
-    await waitFor(() => {
-      expect(mockOnSubmit).toHaveBeenCalledWith({
-        signature: attestationData.signature,
-        notes: '',
-      });
-    });
-  });
-
-  it('handles wallet connection errors gracefully', async () => {
-    const user = userEvent.setup();
-    
-    // Simulate user rejecting wallet connection
-    mockEthereum.request.mockRejectedValueOnce(
-      new Error('User rejected the request')
+    // Mock API error
+    vi.spyOn(api, 'attestQuest').mockRejectedValue(
+      new Error('Failed to attest')
     );
 
     render(
       <QuestAttestationForm
         questId={quest.questId}
-        questTitle={quest.title}
-        onSubmit={mockOnSubmit}
-        onCancel={mockOnCancel}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /sign with wallet/i }));
+    const attestButton = screen.getByRole('button', { name: /Attest Completion/i });
+    await user.click(attestButton);
 
     // Should show error message
     await waitFor(() => {
-      expect(screen.getByText(/failed to connect wallet/i)).toBeInTheDocument();
+      expect(screen.getByText('Failed to attest')).toBeInTheDocument();
     });
 
-    // Should still allow submission without signature
-    await user.click(screen.getByRole('button', { name: /submit attestation/i }));
-    
-    expect(mockOnSubmit).toHaveBeenCalledWith({
-      signature: null,
-      notes: '',
-    });
+    // onSuccess should not have been called
+    expect(mockOnSuccess).not.toHaveBeenCalled();
   });
 
-  it('disables form during signature process', async () => {
+  it('shows loading state during attestation', async () => {
+    const { quest, currentUser } = createTestScenario('attestation');
     const user = userEvent.setup();
     
-    // Setup wallet connection with delay
-    mockEthereum.request.mockImplementation(() => 
-      new Promise(resolve => setTimeout(() => resolve(['0x742d35Cc']), 100))
-    );
+    // Mock API with controlled promise
+    let resolveAttest: () => void;
+    const attestPromise = new Promise<void>((resolve) => {
+      resolveAttest = resolve;
+    });
+    vi.spyOn(api, 'attestQuest').mockReturnValue(attestPromise);
 
     render(
       <QuestAttestationForm
         questId={quest.questId}
-        questTitle={quest.title}
-        onSubmit={mockOnSubmit}
-        onCancel={mockOnCancel}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
       />
     );
 
-    const signButton = screen.getByRole('button', { name: /sign with wallet/i });
-    await user.click(signButton);
+    const attestButton = screen.getByRole('button', { name: /Attest Completion/i });
+    await user.click(attestButton);
 
-    // Button should be disabled during signing
-    expect(signButton).toBeDisabled();
-    expect(signButton).toHaveTextContent(/signing/i);
+    // Button should show loading state
+    expect(attestButton).toBeDisabled();
+    expect(attestButton).toHaveTextContent('Attesting...');
+    
+    // Resolve the promise
+    resolveAttest!();
+    
+    await waitFor(() => {
+      expect(mockOnSuccess).toHaveBeenCalled();
+    });
   });
 
-  it('allows user to cancel attestation', async () => {
+  it('shows correct state when user has already attested', () => {
+    const { quest, currentUser } = createTestScenario('attestation');
+    
+    // Add attestation from current user
+    quest.attestations = [{
+      user_id: currentUser.userId,
+      role: 'requestor',
+      attested_at: new Date().toISOString(),
+    }];
+    
+    render(
+      <QuestAttestationForm
+        questId={quest.questId}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
+      />
+    );
+
+    // Should show 1 of 2 attestations
+    expect(screen.getByText('1 of 2 attestations')).toBeInTheDocument();
+    
+    // Should show user has already attested
+    expect(screen.getByText('You have attested. Waiting for the other party to attest.')).toBeInTheDocument();
+    
+    // Should not show attest button
+    expect(screen.queryByRole('button', { name: /Attest Completion/i })).not.toBeInTheDocument();
+  });
+
+  it('shows completion message when quest is fully attested', () => {
+    const { quest, currentUser, otherUser } = createTestScenario('attestation');
+    
+    // Add both attestations and mark as complete
+    quest.attestations = [
+      {
+        user_id: currentUser.userId,
+        role: 'requestor',
+        attested_at: new Date().toISOString(),
+      },
+      {
+        user_id: otherUser.userId,
+        role: 'performer',
+        attested_at: new Date().toISOString(),
+      }
+    ];
+    quest.status = QuestStatus.COMPLETE;
+    
+    render(
+      <QuestAttestationForm
+        questId={quest.questId}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
+      />
+    );
+
+    // Should show completion message with rewards
+    const successMessage = screen.getByText(/Quest completed!/);
+    expect(successMessage).toBeInTheDocument();
+    expect(successMessage.textContent).toContain(`${quest.rewardXp} XP`);
+    expect(successMessage.textContent).toContain(`${quest.rewardReputation} reputation`);
+    
+    // Should not show attest button
+    expect(screen.queryByRole('button', { name: /Attest Completion/i })).not.toBeInTheDocument();
+  });
+
+  it('allows toggling between simple and cryptographic attestation', async () => {
+    const { quest, currentUser } = createTestScenario('attestation');
     const user = userEvent.setup();
     
     render(
       <QuestAttestationForm
         questId={quest.questId}
-        questTitle={quest.title}
-        onSubmit={mockOnSubmit}
-        onCancel={mockOnCancel}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    // Initially should show simple attestation
+    expect(screen.getByRole('button', { name: /Attest Completion/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Use Cryptographic Attestation/i })).toBeInTheDocument();
 
-    expect(mockOnCancel).toHaveBeenCalled();
-    expect(mockOnSubmit).not.toHaveBeenCalled();
+    // Toggle to cryptographic attestation
+    await user.click(screen.getByRole('button', { name: /Use Cryptographic Attestation/i }));
+
+    // Should now show the toggle back button
+    expect(screen.getByRole('button', { name: /Use Simple Attestation/i })).toBeInTheDocument();
+    
+    // Should show cryptographic attestation component
+    expect(screen.getByText('Cryptographic Attestation')).toBeInTheDocument();
+  });
+
+  it('does not render for quests in invalid states', () => {
+    const { quest, currentUser } = createTestScenario('attestation');
+    
+    // Set quest to OPEN status
+    quest.status = QuestStatus.OPEN;
+    
+    const { container } = render(
+      <QuestAttestationForm
+        questId={quest.questId}
+        quest={quest}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
+      />
+    );
+
+    // Component should return null for non-SUBMITTED/COMPLETE quests
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('fetches quest data if not provided', async () => {
+    const { quest, currentUser } = createTestScenario('attestation');
+    
+    // Mock the API to return quest data
+    vi.spyOn(api, 'getQuest').mockResolvedValue(quest);
+    
+    render(
+      <QuestAttestationForm
+        questId={quest.questId}
+        currentUserId={currentUser.userId}
+        onSuccess={mockOnSuccess}
+      />
+    );
+
+    // Should show loading initially
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+
+    // Wait for quest to load
+    await waitFor(() => {
+      expect(screen.getByText('Dual-Attestation Verification')).toBeInTheDocument();
+    });
+
+    // Verify API was called
+    expect(api.getQuest).toHaveBeenCalledWith(quest.questId);
   });
 });

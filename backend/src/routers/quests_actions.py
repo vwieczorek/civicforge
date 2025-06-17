@@ -9,7 +9,7 @@ import logging
 from ..models import Quest, QuestStatus, QuestSubmission, QuestDispute
 from ..state_machine import QuestStateMachine
 from ..auth import get_current_user_id
-from ..db import db_client
+from ..db import get_db_client, DynamoDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +19,12 @@ router = APIRouter(tags=["quests"])
 @router.post("/quests/{quest_id}/claim", response_model=Quest)
 async def claim_quest(
     quest_id: str,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> Quest:
     """Claim an open quest"""
     # First, check if quest exists and get its current state
-    quest = await db_client.get_quest(quest_id)
+    quest = await db.get_quest(quest_id)
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
     
@@ -39,11 +40,11 @@ async def claim_quest(
             raise HTTPException(status_code=400, detail="Cannot claim this quest")
     
     # Attempt atomic claim
-    success = await db_client.claim_quest_atomic(quest_id, user_id)
+    success = await db.claim_quest_atomic(quest_id, user_id)
     
     if not success:
         # Fetch the latest state to provide accurate error message
-        updated_quest = await db_client.get_quest(quest_id)
+        updated_quest = await db.get_quest(quest_id)
         if updated_quest and updated_quest.status != QuestStatus.OPEN:
             raise HTTPException(
                 status_code=409, 
@@ -56,7 +57,7 @@ async def claim_quest(
             )
     
     # Return the updated quest
-    updated_quest = await db_client.get_quest(quest_id)
+    updated_quest = await db.get_quest(quest_id)
     return updated_quest
 
 
@@ -64,11 +65,12 @@ async def claim_quest(
 async def submit_quest(
     quest_id: str,
     submission: QuestSubmission,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> Quest:
     """Submit completed work for attestation"""
     # Check if quest exists
-    quest = await db_client.get_quest(quest_id)
+    quest = await db.get_quest(quest_id)
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
     
@@ -86,7 +88,7 @@ async def submit_quest(
             )
     
     # Attempt atomic submission
-    success = await db_client.submit_quest_atomic(
+    success = await db.submit_quest_atomic(
         quest_id, 
         user_id, 
         submission.submissionText
@@ -94,7 +96,7 @@ async def submit_quest(
     
     if not success:
         # Get latest state for accurate error message
-        updated_quest = await db_client.get_quest(quest_id)
+        updated_quest = await db.get_quest(quest_id)
         if updated_quest and updated_quest.status != QuestStatus.CLAIMED:
             raise HTTPException(
                 status_code=400,
@@ -107,7 +109,7 @@ async def submit_quest(
             )
     
     # Return updated quest
-    updated_quest = await db_client.get_quest(quest_id)
+    updated_quest = await db.get_quest(quest_id)
     return updated_quest
 
 
@@ -115,14 +117,15 @@ async def submit_quest(
 async def dispute_quest(
     quest_id: str,
     request: QuestDispute,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> Quest:
     """Initiate dispute resolution for a quest"""
     # The reason is already sanitized by the QuestDispute model
     reason = request.reason
     
     # Use atomic operation to prevent race conditions
-    success = await db_client.dispute_quest_atomic(quest_id, user_id, reason)
+    success = await db.dispute_quest_atomic(quest_id, user_id, reason)
     
     if not success:
         raise HTTPException(
@@ -134,7 +137,7 @@ async def dispute_quest(
     logger.info(f"Dispute initiated for quest {quest_id} by user {user_id}: {reason}")
     
     # Return the updated quest
-    quest = await db_client.get_quest(quest_id)
+    quest = await db.get_quest(quest_id)
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
     

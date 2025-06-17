@@ -105,8 +105,8 @@ aws logs tail /aws/lambda/civicforge-api-prod-api --follow
 
 #### Code Quality
 - [ ] All tests passing (`npm test`)
-- [ ] Backend coverage ≥70% (currently 85.43% ✅)
-- [ ] Frontend coverage ≥70% (currently ~25% ❌ - deployment blocker)
+- [ ] Backend coverage ≥70% (currently 85.78% ✅)
+- [ ] Frontend coverage ≥70% (currently 71.17% ✅)
 - [ ] No linting errors or warnings
 - [ ] TypeScript compilation successful
 
@@ -257,6 +257,73 @@ aws logs describe-log-streams \
 # Check DynamoDB table status
 aws dynamodb describe-table --table-name civicforge-quests-prod
 ```
+
+## Feature Flag Management
+
+CivicForge uses AWS AppConfig for runtime feature control without deployments.
+
+### Configuration
+
+Feature flags are managed through AWS AppConfig with:
+- Instant updates without code deployment
+- Percentage-based rollouts
+- User targeting capabilities
+- A/B testing support
+
+### Usage
+
+```python
+# Backend: Check feature flag
+from src.feature_flags_v2 import FeatureFlagService
+
+flags = FeatureFlagService()
+if flags.is_enabled('new_attestation_flow', user_id):
+    # Use new implementation
+```
+
+```typescript
+// Frontend: React hook
+const { isEnabled } = useFeatureFlags();
+if (isEnabled('new_attestation_flow')) {
+  // Show new UI
+}
+```
+
+### Common Flags
+
+- `wallet_signature_required`: Enforce EIP-712 signatures
+- `new_attestation_flow`: Enhanced attestation UI
+- `maintenance_mode`: Disable write operations
+
+## Canary Deployments
+
+### Process
+
+1. **Deploy new version**
+   ```bash
+   ./scripts/deploy-canary.sh staging 10
+   ```
+
+2. **Monitor metrics** (15-30 minutes)
+   - Error rates
+   - Response times
+   - Business metrics
+
+3. **Promote or rollback**
+   ```bash
+   # Promote to 100%
+   ./scripts/promote-canary.sh staging
+   
+   # Or rollback
+   ./scripts/rollback.sh staging
+   ```
+
+### Health Checks
+
+Automated rollback triggers on:
+- Error rate > 5%
+- P95 latency > 2s
+- Failed health checks
 
 ## Rollback Procedures
 

@@ -36,7 +36,7 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const { isSignUpComplete, nextStep } = await signUp({
+      const { nextStep } = await signUp({
         username: email,
         password,
         options: {

@@ -4,7 +4,7 @@ Focus on serialization, validation, and business logic
 """
 
 from datetime import datetime
-from src.db import DynamoDBClient
+from src.db import get_db_client, DynamoDBClient
 from src.models import Quest, QuestStatus, User, FailedReward, Attestation
 
 

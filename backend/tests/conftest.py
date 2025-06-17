@@ -225,11 +225,11 @@ async def dynamodb_tables(moto_server):
 
 
 @pytest.fixture
-def client():
-    """Create test client with all routes included"""
+async def client(dynamodb_tables):
+    """Create test client with all routes included and mocked DB client."""
     from fastapi.testclient import TestClient
     from src.app_factory import create_app
-    from src.db import db_client, DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     # Create a test app with ALL routers to ensure complete test coverage
     from src.routers.quests_read import router as quests_read_router
@@ -254,24 +254,18 @@ def client():
         description="Complete test application with all routes"
     )
     
-    # Reset db_client before each test
-    db_client._client = None
-    db_client._session = None
+    # Create a test DynamoDBClient instance.
+    # The moto_server fixture (via dynamodb_tables) sets DYNAMODB_ENDPOINT_URL,
+    # so DynamoDBClient will automatically connect to the mock server.
+    test_db_client_instance = DynamoDBClient()
     
-    # Force db_client to re-read environment variables
-    # by recreating the singleton
-    import src.db
-    src.db.db_client = DynamoDBClient()
+    # Override the get_db_client dependency to use our test instance
+    app.dependency_overrides[get_db_client] = lambda: test_db_client_instance
     
     yield TestClient(app)
     
-    # Cleanup
+    # Cleanup: clear dependency overrides
     app.dependency_overrides.clear()
-    # Reset db_client after each test
-    if hasattr(db_client, '_client') and db_client._client:
-        db_client._client = None
-    if hasattr(db_client, '_session') and db_client._session:
-        db_client._session = None
 
 
 # Note: authenticated_as is now created per-client in the authenticated_client fixture

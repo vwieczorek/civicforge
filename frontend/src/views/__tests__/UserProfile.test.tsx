@@ -14,6 +14,24 @@ describe('UserProfile', () => {
       userId: 'user-123',
       username: 'testuser',
     });
+    // Add MSW handler for user profile data
+    server.use(
+      http.get('http://localhost:3001/api/v1/users/:id', ({ params }) => {
+        const { id } = params;
+        if (id === 'user-123') {
+          return HttpResponse.json({
+            userId: 'user-123',
+            username: 'testuser',
+            reputation: 85,
+            experience: 1500,
+            createdAt: new Date().toISOString(),
+            createdQuests: [],
+            performedQuests: []
+          });
+        }
+        return HttpResponse.json({ error: 'User not found' }, { status: 404 });
+      })
+    );
   });
 
   it('renders user profile data', async () => {
@@ -78,7 +96,7 @@ describe('UserProfile', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/user not found/i)).toBeInTheDocument();
+      expect(screen.getByText('Failed to load profile. Please try again later.')).toBeInTheDocument();
     });
   });
 

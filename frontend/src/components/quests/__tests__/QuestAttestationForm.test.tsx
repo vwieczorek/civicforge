@@ -34,7 +34,7 @@ describe('QuestAttestationForm', () => {
     it('shows loading state while fetching quest data', async () => {
       // Delay the response to ensure we see the loading state
       server.use(
-        http.get(`${config.API_BASE_URL}/api/v1/quests/:id`, async () => {
+        http.get(`${config.api.url}/api/v1/quests/:id`, async () => {
           await new Promise(resolve => setTimeout(resolve, 100));
           return HttpResponse.json(createMockQuest());
         })
@@ -59,7 +59,7 @@ describe('QuestAttestationForm', () => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
       
       server.use(
-        http.get(`${config.API_BASE_URL}/api/v1/quests/:id`, () => {
+        http.get(`${config.api.url}/api/v1/quests/:id`, () => {
           return HttpResponse.json(
             { detail: 'Quest not found' },
             { status: 404 }
@@ -271,7 +271,8 @@ describe('QuestAttestationForm', () => {
         performerId,
       });
 
-      const { rerender } = render(
+      // Test as requestor
+      const { unmount } = render(
         <QuestAttestationForm 
           quest={mockQuest}
           currentUserId={creatorId}
@@ -280,8 +281,11 @@ describe('QuestAttestationForm', () => {
       );
 
       expect(screen.getByText('Requestor (You)')).toBeInTheDocument();
-
-      rerender(
+      
+      // Unmount and remount with different user (since component doesn't update currentUserId from props)
+      unmount();
+      
+      render(
         <QuestAttestationForm 
           quest={mockQuest}
           currentUserId={performerId}
@@ -304,7 +308,7 @@ describe('QuestAttestationForm', () => {
       });
 
       server.use(
-        http.post(`${config.API_BASE_URL}/api/v1/quests/:id/attest`, async ({ params }) => {
+        http.post(`${config.api.url}/api/v1/quests/:id/attest`, async ({ params }) => {
           expect(params.id).toBe(defaultQuestId);
           return HttpResponse.json(createMockQuest({
             ...mockQuest,
@@ -343,7 +347,7 @@ describe('QuestAttestationForm', () => {
       });
 
       server.use(
-        http.post(`${config.API_BASE_URL}/api/v1/quests/:id/attest`, () => {
+        http.post(`${config.api.url}/api/v1/quests/:id/attest`, () => {
           return HttpResponse.json(
             { detail: 'Attestation failed' },
             { status: 400 }
@@ -385,7 +389,7 @@ describe('QuestAttestationForm', () => {
       });
 
       server.use(
-        http.post(`${config.API_BASE_URL}/api/v1/quests/:id/attest`, async () => {
+        http.post(`${config.api.url}/api/v1/quests/:id/attest`, async () => {
           await attestationPromise;
           return HttpResponse.json(mockQuest);
         })
@@ -460,7 +464,7 @@ describe('QuestAttestationForm', () => {
       });
 
       server.use(
-        http.post(`${config.API_BASE_URL}/api/v1/quests/:id/attest`, async ({ request }) => {
+        http.post(`${config.api.url}/api/v1/quests/:id/attest`, async ({ request }) => {
           const body = await request.json() as any;
           expect(body.signature).toBe('0xmocksignature');
           return HttpResponse.json(createMockQuest({
@@ -547,10 +551,10 @@ describe('QuestAttestationForm', () => {
       });
 
       server.use(
-        http.get(`${config.API_BASE_URL}/api/v1/quests/:id`, () => {
+        http.get(`${config.api.url}/api/v1/quests/:id`, () => {
           return HttpResponse.json(mockQuest);
         }),
-        http.post(`${config.API_BASE_URL}/api/v1/quests/:id/attest`, () => {
+        http.post(`${config.api.url}/api/v1/quests/:id/attest`, () => {
           // Return quest with attestation added
           return HttpResponse.json({
             ...mockQuest,

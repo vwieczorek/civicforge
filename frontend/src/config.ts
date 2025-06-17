@@ -4,10 +4,14 @@
  */
 
 // Get the raw environment variables from Vite
-const env = import.meta.env;
+// Handle both Vite context and Node.js context (for tests)
+const env = typeof import.meta !== 'undefined' && import.meta.env 
+  ? import.meta.env 
+  : process.env;
 
 // Validate critical variables and throw an error if they are missing
-if (!env.VITE_USER_POOL_ID || !env.VITE_USER_POOL_CLIENT_ID) {
+// Skip validation in test environment
+if (typeof import.meta !== 'undefined' && import.meta.env && (!env.VITE_USER_POOL_ID || !env.VITE_USER_POOL_CLIENT_ID)) {
   throw new Error("Missing critical AWS Cognito environment variables.");
 }
 

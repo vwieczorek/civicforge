@@ -5,7 +5,7 @@ This guide walks through deploying the CivicForge application to AWS.
 ## Prerequisites
 
 - AWS CLI configured with appropriate credentials
-- Node.js 18+ and Python 3.9+
+- Node.js 18+ and Python 3.11+
 - Serverless Framework installed: `npm install -g serverless`
 - GitHub repository with OIDC configured
 

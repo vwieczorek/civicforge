@@ -9,7 +9,7 @@ from unittest.mock import patch, AsyncMock
 import uuid
 from botocore.exceptions import ClientError
 
-from src.db import DynamoDBClient
+from src.db import get_db_client, DynamoDBClient
 from src.models import Quest, QuestStatus, User, Attestation
 
 
@@ -17,8 +17,8 @@ from src.models import Quest, QuestStatus, User, Attestation
 async def db_client(dynamodb_tables):
     """Create a DynamoDB client for testing"""
     os.environ['DYNAMODB_ENDPOINT_URL'] = dynamodb_tables
-    client = DynamoDBClient()
-    return client
+    db = DynamoDBClient()
+    return db
 
 
 @pytest.fixture

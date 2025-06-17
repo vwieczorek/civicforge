@@ -9,7 +9,7 @@ import logging
 from ..models import Quest, QuestStatus, AttestationRequest, Attestation
 from ..state_machine import QuestStateMachine
 from ..auth import get_current_user_id
-from ..db import db_client
+from ..db import get_db_client, DynamoDBClient
 from ..signature import verify_attestation_signature
 from ..feature_flags import feature_flags, FeatureFlag
 
@@ -22,7 +22,8 @@ router = APIRouter(tags=["quests"])
 async def attest_quest(
     quest_id: str,
     attestation_request: AttestationRequest,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> Quest:
     """
     Record attestation from requestor or performer.
@@ -30,7 +31,7 @@ async def attest_quest(
     This version uses an atomic update to prevent race conditions.
     """
     # 1. Initial read for validation and role check. This data may be slightly stale.
-    quest = await db_client.get_quest(quest_id)
+    quest = await db.get_quest(quest_id)
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
 
@@ -53,7 +54,7 @@ async def attest_quest(
     # Verify signature if provided
     if attestation_request.signature:
         # Get user's wallet address
-        user = await db_client.get_user(user_id)
+        user = await db.get_user(user_id)
         if not user or not user.walletAddress:
             raise HTTPException(
                 status_code=400,
@@ -87,7 +88,7 @@ async def attest_quest(
     attestation_dict = new_attestation.dict()
     attestation_dict['attested_at'] = attestation_dict['attested_at'].isoformat()
     
-    success = await db_client.add_attestation_atomic(quest_id, attestation_dict)
+    success = await db.add_attestation_atomic(quest_id, attestation_dict)
     
     if not success:
         # The conditional update failed. This means the quest's state changed
@@ -98,7 +99,7 @@ async def attest_quest(
         )
 
     # 3. Post-update logic: Re-fetch the quest state and handle completion.
-    updated_quest = await db_client.get_quest(quest_id)
+    updated_quest = await db.get_quest(quest_id)
     if not updated_quest:
         # This is highly unlikely but a possible edge case.
         raise HTTPException(status_code=500, detail="Quest disappeared after update.")
@@ -106,7 +107,7 @@ async def attest_quest(
     # Check for completion using state machine
     if QuestStateMachine.is_ready_for_completion(updated_quest):
         # Complete the quest atomically to prevent double completion
-        was_completed = await db_client.complete_quest_atomic(quest_id)
+        was_completed = await db.complete_quest_atomic(quest_id)
         
         if was_completed:
             
@@ -116,19 +117,19 @@ async def attest_quest(
                 user_id=updated_quest.performerId
             ):
                 try:
-                    await db_client.award_rewards(
+                    await db.award_rewards(
                         user_id=updated_quest.performerId,
                         xp=updated_quest.rewardXp,
                         reputation=updated_quest.rewardReputation,
                         quest_id=quest_id
                     )
                     # Also award quest creation points to encourage participation
-                    await db_client.award_quest_points(updated_quest.performerId, 2)
+                    await db.award_quest_points(updated_quest.performerId, 2)
                 except Exception as e:
                     # Log the error but don't fail the quest completion
                     # The quest is already marked complete, rewards can be retried later
                     logger.warning(f"Quest {quest_id} completed but reward distribution failed: {e}")
-                    # Failed rewards are automatically tracked by db_client.award_rewards()
+                    # Failed rewards are automatically tracked by db.award_rewards()
             elif updated_quest.performerId:
                 # Feature flag is off - log for monitoring
                 logger.info(f"Quest {quest_id} completed but rewards disabled by feature flag")

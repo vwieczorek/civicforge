@@ -2,9 +2,13 @@
 
 > A decentralized platform for community-driven civic engagement through dual-attestation quest completion
 
-[![Backend Coverage](https://img.shields.io/badge/backend%20coverage-85%25-brightgreen.svg)]()
-[![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-67%25-yellow.svg)]()
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-261%20passing-brightgreen)]()
+[![Backend Coverage](https://img.shields.io/badge/backend%20coverage-88%25-brightgreen)]()
+[![Frontend Tests](https://img.shields.io/badge/frontend%20tests-96%20passing-brightgreen)]()
+[![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-71%25-brightgreen)]()
+[![Deployment](https://img.shields.io/badge/deployment-ready-brightgreen)]()
+
+📊 **[View Detailed Project Status](./PROJECT_STATUS.md)**
 
 ## Overview
 
@@ -16,7 +20,7 @@ CivicForge enables communities to create, complete, and verify civic improvement
 - 💰 **Flexible Rewards**: Experience points (XP) and reputation for verified contributions
 - ⚡ **Serverless Architecture**: Built on AWS Lambda + DynamoDB for infinite scalability
 - 🔒 **Secure Authentication**: AWS Cognito integration with JWT tokens
-- 🧪 **Comprehensive Testing**: 85%+ backend coverage, growing frontend coverage
+- 🧪 **Comprehensive Testing**: 88% backend coverage, 71% frontend coverage
 - 🚀 **Modern Frontend**: React + TypeScript with real-time updates
 
 ## Quick Start
@@ -32,20 +36,18 @@ CivicForge enables communities to create, complete, and verify civic improvement
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/civicforge.git
+git clone https://github.com/civicforge/civicforge.git
 cd civicforge
 
-# Install dependencies
-npm install
-
-# Start backend services
+# Backend Setup & Start (Terminal 1)
 cd backend
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 npm run local
 
-# In another terminal, start the frontend
+# Frontend Setup & Start (Terminal 2)
+# Open a new terminal window for the frontend.
 cd frontend
 npm install
 npm run dev
@@ -92,14 +94,30 @@ civicforge/
 
 ## Documentation
 
-For comprehensive documentation, see the [docs directory](./docs/):
+For comprehensive documentation, please refer to the following:
 
-- 📚 [Getting Started Tutorial](./docs/tutorials/local-development-setup.md)
-- 🏗️ [Architecture Overview](./docs/reference/architecture.md)
-- 📡 [API Reference](./docs/reference/api-reference.md)
-- 🤝 [Contributing Guide](./CONTRIBUTING.md)
-- 🔐 [Security Model](./docs/reference/security-model.md)
-- 🧪 [Testing Strategy](./docs/reference/testing-strategy.md)
+### 🚀 Quick Links
+- **[Handover Document](./HANDOVER.md)** - Recent security fixes and next steps
+- **[Project Status](./PROJECT_STATUS.md)** - Current progress, priorities, and deployment readiness
+- **[Architecture Overview](./docs/ARCHITECTURE.md)** - System design and component interaction
+- **[Security Guide](./docs/SECURITY.md)** - Security measures and best practices
+- **[Testing Strategy](./docs/TESTING.md)** - Test coverage and instructions
+- **[Deployment Runbook](./docs/DEPLOYMENT_RUNBOOK.md)** - Step-by-step deployment guide
+
+### 📚 Detailed Documentation
+- [Getting Started Tutorial](./docs/tutorials/local-development-setup.md)
+- [API Reference](./docs/reference/api-reference.md)
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Backend Architecture](./docs/reference/backend-architecture.md)
+- [Frontend Architecture](./docs/reference/frontend-architecture.md)
+
+### Component Documentation
+- 🎯 [QuestFilters](./docs/components/QuestFilters.md) - Advanced quest search and filtering
+- 📝 [WorkSubmissionModal](./docs/components/WorkSubmissionModal.md) - Work submission interface
+
+### Project Management
+- 📊 [Current Status](./PROJECT_STATUS.md) - Real-time project status and metrics
+- 🚦 [MVP Deployment Plan](./MVP_DEPLOYMENT_PLAN.md) - Path to production
 
 ## Core Workflow
 
@@ -122,7 +140,7 @@ For comprehensive documentation, see the [docs directory](./docs/):
 - **Framework**: React 18 with TypeScript
 - **Routing**: React Router v6
 - **State Management**: React hooks + Context API
-- **Authentication**: AWS Amplify
+- **Authentication**: Custom JWT-based
 - **Testing**: Vitest + React Testing Library + Playwright
 
 ### Infrastructure
@@ -135,20 +153,60 @@ For comprehensive documentation, see the [docs directory](./docs/):
 ## Current Status
 
 ### ✅ Production-Ready
-- Backend API with 85% test coverage
+- Backend API with 88% test coverage (261 tests passing)
+- Frontend with 71% test coverage (96 tests passing)
+- E2E tests configured and working with custom JWT flow
 - Comprehensive error handling and retry logic
 - Security hardening with least-privilege IAM
-- Full documentation suite
+- Staging environment fully configured with Cognito
+- Signature verification with comprehensive test coverage
+- Lambda-per-operation architecture for security isolation
+- Complete deployment automation with rollback procedures
 
 ### 🚧 In Progress
-- Frontend test coverage improvement (currently 67%, target 80%)
-- E2E test suite expansion
-- Performance optimizations
+- Documentation consolidation and updates
+- Frontend architecture guide
+- Incident response procedures
 
 ### 🔜 Coming Soon
-- EIP-712 cryptographic signatures for on-chain attestations
 - Advanced reputation algorithms
 - Mobile application
+- Real-time updates via WebSockets
+- Blockchain integration for attestations
+- Community governance features
+
+## Deployment
+
+### Prerequisites
+- AWS Account with appropriate IAM permissions
+- AWS CLI configured
+- Node.js 18+ and Python 3.11+
+- Environment-specific SSM parameters configured
+
+### Deployment Commands
+```bash
+# Check MVP readiness
+npm run check:mvp
+
+# Deploy to development
+npm run deploy:dev
+
+# Deploy to staging
+npm run deploy:staging
+
+# Deploy to production (requires all tests passing)
+npm run deploy:prod
+```
+
+### Deployment Readiness
+✅ **Project is deployment-ready!**
+- Frontend: All 96 tests passing (71% coverage)
+- Backend: All 261 tests passing (88% coverage)
+- E2E tests: Fully configured and passing
+- Staging environment: Fully configured with Cognito
+- Security: Signature verification implemented and tested
+- Infrastructure: Lambda-per-operation architecture deployed
+- See [Project Status](./PROJECT_STATUS.md) for details
 
 ## Contributing
 

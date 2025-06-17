@@ -812,9 +812,6 @@ class DynamoDBClient:
             return None
 
 
-# Create a singleton instance
-# Global singleton - will be replaced with dependency injection
-db_client = DynamoDBClient()
 
 def get_db_client() -> DynamoDBClient:
     """

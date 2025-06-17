@@ -34,7 +34,7 @@ describe('ApiClient', () => {
       // Add a one-time handler to verify the auth header
       let capturedHeaders: any = null
       server.use(
-        http.get(`${config.API_BASE_URL}/test-auth`, ({ request }) => {
+        http.get(`${config.api.url}/test-auth`, ({ request }) => {
           capturedHeaders = Object.fromEntries(request.headers.entries())
           return HttpResponse.json({ success: true })
         })
@@ -51,7 +51,7 @@ describe('ApiClient', () => {
       
       let capturedHeaders: any = null
       server.use(
-        http.get(`${config.API_BASE_URL}/test-no-auth`, ({ request }) => {
+        http.get(`${config.api.url}/test-no-auth`, ({ request }) => {
           capturedHeaders = Object.fromEntries(request.headers.entries())
           return HttpResponse.json({ success: true })
         })
@@ -86,7 +86,7 @@ describe('ApiClient', () => {
 
     it('should throw generic error when no detail provided', async () => {
       server.use(
-        http.get(`${config.API_BASE_URL}/error/generic`, () => {
+        http.get(`${config.api.url}/error/generic`, () => {
           return HttpResponse.json({}, { status: 400 })
         })
       )
@@ -96,7 +96,7 @@ describe('ApiClient', () => {
 
     it('should handle network errors', async () => {
       server.use(
-        http.get(`${config.API_BASE_URL}/network-error`, () => {
+        http.get(`${config.api.url}/network-error`, () => {
           throw new Error('Network error')
         })
       )

@@ -8,7 +8,7 @@ import logging
 from eth_utils import is_checksum_address
 
 from ..auth import get_current_user_id
-from ..db import db_client
+from ..db import get_db_client, DynamoDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -18,19 +18,20 @@ router = APIRouter(tags=["users"])
 @router.get("/users/{user_id}", response_model=Dict)
 async def get_user_profile(
     user_id: str,
-    current_user_id: str = Depends(get_current_user_id)
+    current_user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> Dict:
     """Get user profile with quest statistics"""
     # Allow users to view their own profile or others (for public profiles)
-    user = await db_client.get_user(user_id)
+    user = await db.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     # Get user's created quests
-    created_quests = await db_client.get_user_created_quests(user_id)
+    created_quests = await db.get_user_created_quests(user_id)
     
     # Get user's performed quests
-    performed_quests = await db_client.get_user_performed_quests(user_id)
+    performed_quests = await db.get_user_performed_quests(user_id)
     
     # Prepare response
     profile_data = user.dict()
@@ -48,7 +49,8 @@ async def get_user_profile(
 @router.put("/users/wallet", response_model=Dict[str, str])
 async def update_wallet_address(
     wallet_address: str = Body(...),
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> Dict[str, str]:
     """Update user's wallet address for signature verification"""
     # Validate Ethereum address format and checksum
@@ -67,7 +69,7 @@ async def update_wallet_address(
     
     # Update user's wallet address
     try:
-        await db_client.update_user_wallet(user_id, wallet_address)
+        await db.update_user_wallet(user_id, wallet_address)
         return {"message": "Wallet address updated successfully", "address": wallet_address}
     except Exception as e:
         logger.error(f"Failed to update wallet address: {e}", exc_info=True)

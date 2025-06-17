@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import CreateQuest from '../CreateQuest';
@@ -61,7 +61,9 @@ describe('CreateQuest', () => {
     await user.click(submitButton);
 
     // Form should not submit with empty fields
-    expect(mockNavigate).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   it('validates minimum reward points', async () => {
@@ -90,8 +92,8 @@ describe('CreateQuest', () => {
 
     // Should show validation errors
     await waitFor(() => {
-      expect(screen.getByText(/XP must be at least 10/i)).toBeInTheDocument();
-      expect(screen.getByText(/reputation must be at least 1/i)).toBeInTheDocument();
+      expect(screen.getByText(/XP reward must be at least 10/i)).toBeInTheDocument();
+      expect(screen.getByText(/Reputation reward must be at least 1/i)).toBeInTheDocument();
     });
   });
 
@@ -164,6 +166,13 @@ describe('CreateQuest', () => {
 
   it('disables form during submission', async () => {
     const user = userEvent.setup();
+    server.use(
+      http.post('http://localhost:3001/api/v1/quests', async () => {
+        // Introduce a delay to allow the loading state to be asserted
+        await new Promise(res => setTimeout(res, 50));
+        return HttpResponse.json({ questId: 'quest-new' }, { status: 201 });
+      })
+    );
     
     render(
       <MemoryRouter>
@@ -178,8 +187,10 @@ describe('CreateQuest', () => {
     const submitButton = screen.getByRole('button', { name: /create quest/i });
 
     await user.type(titleInput, 'Test Quest');
-    await user.type(descriptionInput, 'Test Description');
+    await user.type(descriptionInput, 'This is a test description that is long enough');
+    await user.clear(xpInput);
     await user.type(xpInput, '100');
+    await user.clear(repInput);
     await user.type(repInput, '10');
 
     await user.click(submitButton);
