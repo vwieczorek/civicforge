@@ -493,3 +493,214 @@ resources:
         Threshold: 3600  # 1 hour
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching
+    
+    # Performance Monitoring Alarms for Lambda Functions
+    
+    # API Function Performance Alarms
+    ApiDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-duration
+        AlarmDescription: "Alert when API Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 3000  # 3 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    ApiThrottlesAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-throttles
+        AlarmDescription: "Alert when API Lambda is being throttled"
+        MetricName: Throttles
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    ApiConcurrentExecutionsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-concurrent-executions
+        AlarmDescription: "Alert when API Lambda concurrent executions are high"
+        MetricName: ConcurrentExecutions
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Maximum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 900  # 90% of default 1000 limit
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    ApiErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-function-errors
+        AlarmDescription: "Alert when API Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # CreateQuest Function Performance Alarms
+    CreateQuestDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createQuest-duration
+        AlarmDescription: "Alert when CreateQuest Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createQuest
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 2000  # 2 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    CreateQuestErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createQuest-errors
+        AlarmDescription: "Alert when CreateQuest Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createQuest
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # AttestQuest Function Performance Alarms
+    AttestQuestDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-attestQuest-duration
+        AlarmDescription: "Alert when AttestQuest Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-attestQuest
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 2000  # 2 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    AttestQuestErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-attestQuest-errors
+        AlarmDescription: "Alert when AttestQuest Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-attestQuest
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # DeleteQuest Function Performance Alarms
+    DeleteQuestDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-deleteQuest-duration
+        AlarmDescription: "Alert when DeleteQuest Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-deleteQuest
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 2000  # 2 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    DeleteQuestErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-deleteQuest-errors
+        AlarmDescription: "Alert when DeleteQuest Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-deleteQuest
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # CreateUserTrigger Function Performance Alarms
+    CreateUserTriggerDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createUserTrigger-duration
+        AlarmDescription: "Alert when CreateUserTrigger Lambda duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createUserTrigger
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 1000  # 1 second
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    CreateUserTriggerErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createUserTrigger-errors
+        AlarmDescription: "Alert when CreateUserTrigger Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createUserTrigger
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 3
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
