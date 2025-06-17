@@ -9,9 +9,36 @@ provider:
   region: ${opt:region, 'us-east-1'}
   
   httpApi:
+    # Cognito JWT Authorizer configuration
+    authorizers:
+      cognitoJwtAuthorizer:
+        type: jwt
+        issuerUrl: https://cognito-idp.${self:provider.region}.amazonaws.com/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
+        audience:
+          - ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
+    # Apply authorizer by default to all endpoints
+    authorizer: cognitoJwtAuthorizer
+    # CORS configuration for frontend integration
+    cors:
+      allowedOrigins:
+        - ${ssm:/civicforge/${self:provider.stage}/frontend-url, 'http://localhost:5173'}
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+      allowCredentials: true
     throttle:
       rateLimit: 100  # requests per second
       burstLimit: 200  # burst capacity
+  
+  # Enable AWS X-Ray tracing for better observability
+  tracing:
+    lambda: true
+    apiGateway: true
   
   environment:
     COGNITO_REGION: ${self:provider.region}
@@ -36,6 +63,12 @@ provider:
             - logs:CreateLogStream
             - logs:PutLogEvents
           Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*:*"
+        # X-Ray tracing permissions
+        - Effect: Allow
+          Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+          Resource: "*"
 
 custom:
   usersTable: civicforge-${self:provider.stage}-users
@@ -52,10 +85,11 @@ functions:
   api:
     handler: handlers.api.handler
     events:
-      # Health check and general routes
+      # Health check (public endpoint - no authentication required)
       - httpApi:
           path: /health
           method: GET
+          authorizer: none
       - httpApi:
           path: /api/v1/quests
           method: GET
@@ -91,12 +125,22 @@ functions:
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}/index/*"
-      # Update permissions for quest operations
+      # Update permissions for quest operations - restricted to specific attributes
       - Effect: Allow
         Action:
           - dynamodb:UpdateItem
         Resource:
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "status"
+              - "performerId"
+              - "claimedAt"
+              - "submissionText"
+              - "submittedAt"
+              - "disputeReason"
+              - "updatedAt"
       # Restricted UpdateItem on UsersTable - only allow wallet address updates
       - Effect: Allow
         Action:
@@ -226,7 +270,7 @@ functions:
           - "dynamodb:PutItem"
           - "dynamodb:GetItem"
         Resource:
-          - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
     onError: !GetAtt UserCreationDLQ.Arn
   
   # DLQ Re-processor for failed rewards
@@ -429,5 +473,23 @@ resources:
         Period: 300  # 5 minutes
         EvaluationPeriods: 1
         Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Alarm for stuck messages in User Creation DLQ
+    UserCreationDLQStaleMessagesAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:provider.stage}-UserCreationDLQ-StaleMsgs
+        AlarmDescription: "Alert when messages are stuck in User Creation DLQ"
+        MetricName: ApproximateAgeOfOldestMessage
+        Namespace: AWS/SQS
+        Dimensions:
+          - Name: QueueName
+            Value: !GetAtt UserCreationDLQ.QueueName
+        Statistic: Maximum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 3600  # 1 hour
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching
