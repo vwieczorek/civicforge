@@ -13,7 +13,7 @@ CivicForge consists of:
 
 ### Required Software
 - Node.js 18+ ([download](https://nodejs.org/))
-- Python 3.9+ ([download](https://www.python.org/))
+- Python 3.11+ ([download](https://www.python.org/))
 - AWS CLI ([install guide](https://aws.amazon.com/cli/))
 - Docker (for local DynamoDB)
 
@@ -223,7 +223,7 @@ git commit -m "feat: add your feature description"
 
 1. Read the [Architecture Guide](../reference/architecture.md)
 2. Review [Contributing Guidelines](../../CONTRIBUTING.md)
-3. Check out [Testing Best Practices](../how-to-guides/running-backend-tests.md)
+3. Check out [Testing Guide](../TESTING.md)
 4. Join our Discord for help and discussions
 
 Happy coding! 🚀

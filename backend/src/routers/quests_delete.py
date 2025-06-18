@@ -7,7 +7,7 @@ import logging
 
 from ..models import QuestStatus
 from ..auth import get_current_user_id
-from ..db import db_client
+from ..db import get_db_client, DynamoDBClient
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +20,12 @@ QUEST_CREATION_COST = 1  # Points to refund when quest is deleted
 @router.delete("/quests/{quest_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_quest(
     quest_id: str,
-    user_id: str = Depends(get_current_user_id)
+    user_id: str = Depends(get_current_user_id),
+    db: DynamoDBClient = Depends(get_db_client)
 ) -> None:
     """Delete a quest - only allowed by creator and only if unclaimed"""
     # First check if quest exists
-    quest = await db_client.get_quest(quest_id)
+    quest = await db.get_quest(quest_id)
     if not quest:
         raise HTTPException(status_code=404, detail="Quest not found")
     
@@ -43,7 +44,7 @@ async def delete_quest(
         )
     
     # Attempt atomic delete with conditions
-    success = await db_client.delete_quest_atomic(quest_id, user_id)
+    success = await db.delete_quest_atomic(quest_id, user_id)
     
     if not success:
         raise HTTPException(
@@ -52,6 +53,6 @@ async def delete_quest(
         )
     
     # Refund quest creation points since quest was never completed
-    await db_client.award_quest_points(user_id, QUEST_CREATION_COST)
+    await db.award_quest_points(user_id, QUEST_CREATION_COST)
     
     return None

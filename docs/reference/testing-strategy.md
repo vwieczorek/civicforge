@@ -1,5 +1,7 @@
 # Testing Strategy
 
+> ⚠️ **DEPRECATED**: This document has been superseded by [docs/TESTING.md](/docs/TESTING.md). Please refer to that document for the current testing strategy and guidelines.
+
 *Last Updated: December 2024*
 
 ## Overview
@@ -232,9 +234,9 @@ test('complete quest lifecycle', async ({ page, authenticatedUser }) => {
 
 | Component | Current | Target | Priority |
 |-----------|---------|--------|----------|
-| Backend API | 85.43% | 85% | ✅ Achieved |
-| Frontend Components | 67% | 80% | 🚧 High |
-| E2E Tests | 60% | 70% | 🚧 Medium |
+| Backend API | 85.78% | 85% | ✅ Achieved |
+| Frontend Components | 71.17% | 70% | ✅ Achieved |
+| E2E Tests | 0% | 70% | 🚧 High |
 | Integration Tests | 75% | 80% | 🚧 Medium |
 
 ### Critical Path Coverage
@@ -258,7 +260,7 @@ These paths MUST have 100% coverage:
 
 ## Current Status
 
-### Backend (✅ 85.43% Coverage)
+### Backend (✅ 85.78% Coverage)
 
 **Well Tested:**
 - Quest CRUD operations
@@ -270,29 +272,32 @@ These paths MUST have 100% coverage:
 - Edge cases in reward distribution
 - Complex query scenarios
 
-### Frontend (🚧 67% Coverage)
+### Frontend (✅ 71.17% Coverage)
 
 **Well Tested:**
 - API client
 - Authentication hooks
 - Core components
-
-**Needs Improvement:**
-- User interaction flows
 - Error boundaries
-- Loading states
-- Form validations
-
-### E2E (🚧 60% Coverage)
-
-**Well Tested:**
-- Happy path flows
-- Basic error scenarios
+- Configuration management
 
 **Needs Improvement:**
+- Complex user interaction flows
+- Advanced form validations
+- Edge case scenarios
+
+### E2E (❌ 0% Coverage - Configuration Broken)
+
+**Status:**
+- Playwright configuration needs fixing
+- Tests exist but cannot run
+- Priority for post-MVP
+
+**Planned Coverage:**
+- Happy path flows
+- Error scenarios
 - Network failure handling
 - Cross-browser testing
-- Mobile responsive tests
 
 ## Testing Tools
 

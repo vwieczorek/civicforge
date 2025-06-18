@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCurrentUser } from 'aws-amplify/auth';
+import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 import { Quest, QuestStatus } from '../api/types';
 import QuestAttestationForm from '../components/quests/QuestAttestationForm';
 import QuestAttestationDisplay from '../components/quests/QuestAttestationDisplay';
+import WorkSubmissionModal from '../components/quests/WorkSubmissionModal';
 
 const QuestDetail: React.FC = () => {
   const { questId } = useParams<{ questId: string }>();
@@ -13,6 +15,7 @@ const QuestDetail: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showWorkSubmissionModal, setShowWorkSubmissionModal] = useState(false);
 
   useEffect(() => {
     if (questId) {
@@ -55,24 +58,28 @@ const QuestDetail: React.FC = () => {
     try {
       await apiClient.post(`/api/v1/quests/${questId}/claim`, {});
       await fetchQuestAndUser(); // Refresh quest data
+      toast.success('Quest claimed successfully!');
     } catch (err) {
       console.error('Failed to claim quest:', err);
-      alert('Failed to claim quest. Please try again.');
+      toast.error('Failed to claim quest. Please try again.');
     }
   };
 
-  const handleSubmitWork = async () => {
-    const submissionText = prompt('Describe your completed work:');
-    if (!submissionText) return;
+  const handleSubmitWork = () => {
+    setShowWorkSubmissionModal(true);
+  };
 
+  const handleWorkSubmission = async (submissionText: string) => {
     try {
       await apiClient.post(`/api/v1/quests/${questId}/submit`, {
         submissionText: submissionText
       });
       await fetchQuestAndUser(); // Refresh quest data
+      setShowWorkSubmissionModal(false);
+      toast.success('Work submitted successfully!');
     } catch (err) {
       console.error('Failed to submit work:', err);
-      alert('Failed to submit work. Please try again.');
+      toast.error('Failed to submit work. Please try again.');
     }
   };
 
@@ -89,7 +96,7 @@ const QuestDetail: React.FC = () => {
       <div className="error-container">
         <p className="error-message">{error || 'Quest not found'}</p>
         <button onClick={() => navigate('/')} className="back-button">
-          Back to Quests
+          ← Back to Quests
         </button>
       </div>
     );
@@ -162,6 +169,8 @@ const QuestDetail: React.FC = () => {
               <p>Please review the work and provide your attestation.</p>
               <QuestAttestationForm 
                 questId={quest.questId}
+                quest={quest}
+                currentUserId={currentUserId}
                 onSuccess={() => fetchQuestAndUser()}
               />
             </div>
@@ -195,6 +204,15 @@ const QuestDetail: React.FC = () => {
       <button onClick={() => navigate('/')} className="back-button">
         ← Back to Quests
       </button>
+      
+      {quest && (
+        <WorkSubmissionModal
+          isOpen={showWorkSubmissionModal}
+          onClose={() => setShowWorkSubmissionModal(false)}
+          onSubmit={handleWorkSubmission}
+          questTitle={quest.title}
+        />
+      )}
     </div>
   );
 };

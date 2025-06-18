@@ -82,7 +82,7 @@ describe('ProtectedRoute - Authentication Flow', () => {
   it('preserves the original location when redirecting to login', async () => {
     mockGetCurrentUser.mockRejectedValue(new Error('Not authenticated'));
     
-    const { container } = render(
+    render(
       <MemoryRouter initialEntries={['/quests/quest-123?tab=details']}>
         <Routes>
           <Route 

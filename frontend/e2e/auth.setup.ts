@@ -10,15 +10,15 @@ setup('authenticate', async ({ page }) => {
   // Navigate to the app
   await page.goto('/');
   
-  // Wait for Amplify UI authenticator to load
-  await page.waitForSelector('[data-amplify-authenticator]', { timeout: 10000 });
+  // Wait for the custom login page to load by looking for its heading
+  await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible({ timeout: 10000 });
   
-  // Fill in credentials
-  await page.fill('input[name="username"]', username);
-  await page.fill('input[name="password"]', password);
+  // Fill in credentials using the correct labels from the custom form
+  await page.getByLabel('Email').fill(username);
+  await page.getByLabel('Password').fill(password);
   
-  // Submit login form
-  await page.click('button[type="submit"]');
+  // Submit login form by finding the button with its specific text
+  await page.getByRole('button', { name: 'Sign In' }).click();
   
   // Wait for successful authentication
   // Look for the sign out button as indicator of successful login

@@ -226,37 +226,36 @@ def award_rewards_idempotently(
     """
     try:
         # Build update expression dynamically based on what needs to be awarded
-        update_parts = []
-        expression_values = {':reward_id': {reward_id}}
+        set_parts = []
+        expression_values = {':reward_id_set': {reward_id}, ':reward_id_str': reward_id}
         
         if xp_amount > 0:
-            update_parts.append('xp = xp + :xp')
+            set_parts.append('experience = experience + :xp')
             expression_values[':xp'] = xp_amount
             
         if reputation_amount > 0:
-            update_parts.append('reputation = reputation + :rep')
+            set_parts.append('reputation = reputation + :rep')
             expression_values[':rep'] = reputation_amount
             
         if quest_points_amount > 0:
-            update_parts.append('questPoints = questPoints + :qp')
+            set_parts.append('questCreationPoints = questCreationPoints + :qp')
             expression_values[':qp'] = quest_points_amount
         
-        # Always add the reward ID to processed set
-        update_parts.append('processedRewardIds = list_append(if_not_exists(processedRewardIds, :empty_list), :reward_id)')
-        expression_values[':empty_list'] = []
+        # Build complete update expression
+        update_expression = ''
+        if set_parts:
+            update_expression = 'SET ' + ', '.join(set_parts) + ' '
+        update_expression += 'ADD processedRewardIds :reward_id_set'
         
         # Perform the update with condition
         users_table.update_item(
             Key={'userId': user_id},
-            UpdateExpression='SET ' + ', '.join(update_parts),
+            UpdateExpression=update_expression,
             ConditionExpression=(
                 'attribute_exists(userId) AND '
                 '(attribute_not_exists(processedRewardIds) OR NOT contains(processedRewardIds, :reward_id_str))'
             ),
-            ExpressionAttributeValues={
-                **expression_values,
-                ':reward_id_str': reward_id
-            }
+            ExpressionAttributeValues=expression_values
         )
         
         logger.info(f"Successfully awarded rewards for {reward_id} to user {user_id}")

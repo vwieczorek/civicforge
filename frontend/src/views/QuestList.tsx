@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { Quest, QuestStatus } from '../api/types';
 import LoadingSkeleton from '../components/common/LoadingSkeleton';
 import { useErrorHandler } from '../hooks/useErrorHandler';
 import toast from 'react-hot-toast';
+import QuestFilters, { FilterOptions } from '../components/quests/QuestFilters';
 
 const QuestCard: React.FC<{ quest: Quest }> = ({ quest }) => {
   const getStatusBadgeClass = (status: QuestStatus) => {
@@ -37,9 +38,6 @@ const QuestCard: React.FC<{ quest: Quest }> = ({ quest }) => {
           <strong>Reputation:</strong> {quest.rewardReputation}
         </span>
       </div>
-      <Link to={`/quests/${quest.questId}`} className="quest-link">
-        View Details →
-      </Link>
     </div>
   );
 };
@@ -48,7 +46,13 @@ const QuestList: React.FC = () => {
   const [quests, setQuests] = useState<Quest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterOptions>({
+    search: '',
+    status: '',
+    sortBy: 'newest'
+  });
   const { handleError } = useErrorHandler();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchQuests();
@@ -70,6 +74,50 @@ const QuestList: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Filter and sort quests - must be before conditional returns
+  const filteredAndSortedQuests = useMemo(() => {
+    let filtered = [...quests];
+    
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(quest => 
+        quest.title.toLowerCase().includes(searchLower) ||
+        quest.description.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(quest => quest.status === filters.status);
+    }
+    
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (filters.sortBy) {
+        case 'newest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'xp-high':
+          return b.rewardXp - a.rewardXp;
+        case 'xp-low':
+          return a.rewardXp - b.rewardXp;
+        case 'reputation-high':
+          return b.rewardReputation - a.rewardReputation;
+        case 'reputation-low':
+          return a.rewardReputation - b.rewardReputation;
+        default:
+          return 0;
+      }
+    });
+    
+    return filtered;
+  }, [quests, filters]);
+
+  const openQuests = filteredAndSortedQuests.filter(q => q.status === QuestStatus.OPEN);
+  const otherQuests = filteredAndSortedQuests.filter(q => q.status !== QuestStatus.OPEN);
 
   if (isLoading) {
     return (
@@ -101,9 +149,6 @@ const QuestList: React.FC = () => {
     );
   }
 
-  const openQuests = quests.filter(q => q.status === QuestStatus.OPEN);
-  const otherQuests = quests.filter(q => q.status !== QuestStatus.OPEN);
-
   return (
     <div className="quest-list-container">
       <div className="page-header">
@@ -113,12 +158,32 @@ const QuestList: React.FC = () => {
         </p>
       </div>
 
-      {openQuests.length > 0 ? (
+      <QuestFilters filters={filters} onFilterChange={setFilters} />
+
+      {filteredAndSortedQuests.length === 0 ? (
+        <div className="empty-state">
+          <p>No quests found matching your filters.</p>
+          {(filters.search || filters.status) && (
+            <button 
+              onClick={() => setFilters({ search: '', status: '', sortBy: 'newest' })} 
+              className="clear-filters-button"
+            >
+              Clear Filters
+            </button>
+          )}
+        </div>
+      ) : openQuests.length > 0 ? (
         <div className="quest-section">
           <h2>Open Quests</h2>
           <div className="quest-grid">
             {openQuests.map(quest => (
-              <QuestCard key={quest.questId} quest={quest} />
+              <div 
+                key={quest.questId} 
+                onClick={() => navigate(`/quests/${quest.questId}`)}
+                style={{ cursor: 'pointer' }}
+              >
+                <QuestCard quest={quest} />
+              </div>
             ))}
           </div>
         </div>
@@ -136,7 +201,13 @@ const QuestList: React.FC = () => {
           <h2>Recent Activity</h2>
           <div className="quest-grid">
             {otherQuests.map(quest => (
-              <QuestCard key={quest.questId} quest={quest} />
+              <div 
+                key={quest.questId} 
+                onClick={() => navigate(`/quests/${quest.questId}`)}
+                style={{ cursor: 'pointer' }}
+              >
+                <QuestCard quest={quest} />
+              </div>
             ))}
           </div>
         </div>

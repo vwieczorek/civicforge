@@ -1,5 +1,7 @@
 # How to Run Backend Tests
 
+> ⚠️ **DEPRECATED**: This document has been superseded by [docs/TESTING.md](/docs/TESTING.md). Please refer to that document for current instructions on running tests.
+
 This guide walks you through running the CivicForge backend test suite.
 
 ## Prerequisites

@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+*.cover
+.hypothesis/
+.ruff_cache/
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Lambda packages
+lambda-packages/
+vendor/
+
+# Temporary files
+*.log
+*.tmp
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Serverless
+.serverless/
+.requirements.zip
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+.env.*
+
+# Testing
+pytest-cov.pth
+pytest.ini
+
+# Don't ignore critical project files
+!README.md
+!requirements.txt
+!serverless.yml
+!pytest.ini

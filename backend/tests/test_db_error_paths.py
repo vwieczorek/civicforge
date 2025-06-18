@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from unittest.mock import patch, AsyncMock, MagicMock
 from botocore.exceptions import ClientError
 
-from src.db import DynamoDBClient
+from src.db import get_db_client, DynamoDBClient
 from src.models import Quest, QuestStatus, User, Attestation
 
 
@@ -22,8 +22,8 @@ async def db_client():
     os.environ['USERS_TABLE_NAME'] = 'test-users'
     os.environ['FAILED_REWARDS_TABLE_NAME'] = 'test-failed-rewards'
     
-    client = DynamoDBClient()
-    return client
+    db = DynamoDBClient()
+    return db
 
 
 class TestAtomicOperationErrors:
@@ -319,7 +319,7 @@ class TestFailedRewardRecovery:
         db_client.failed_rewards_table_name = "test-failed-rewards"
         
         mock_dynamodb_client = AsyncMock()
-        mock_dynamodb_client.scan.return_value = {
+        mock_dynamodb_client.query.return_value = {
             'Items': [
                 {
                     'rewardId': {'S': 'failure-1'},

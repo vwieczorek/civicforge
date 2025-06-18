@@ -17,7 +17,16 @@ from botocore.exceptions import ClientError
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# Import idempotency decorator
+try:
+    from ..utils.idempotency import user_creation_idempotent
+except ImportError:
+    # Fallback if idempotency not available
+    def user_creation_idempotent(func):
+        return func
+
 # Environment variables
+INITIAL_POINTS = int(os.environ.get("INITIAL_QUEST_CREATION_POINTS", "10"))
 USERS_TABLE = os.environ.get("USERS_TABLE_NAME")
 if not USERS_TABLE:
     raise ValueError("Missing required environment variable: USERS_TABLE_NAME")
@@ -27,6 +36,7 @@ dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(USERS_TABLE)
 
 
+@user_creation_idempotent
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
     Cognito PostConfirmation trigger handler.
@@ -57,7 +67,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'username': username,
             'reputation': 0,
             'experience': 0,
-            'questCreationPoints': 10,  # Default initial points - should match settings.initial_quest_creation_points
+            'questCreationPoints': INITIAL_POINTS,
             'createdAt': timestamp,
             'updatedAt': timestamp
         }

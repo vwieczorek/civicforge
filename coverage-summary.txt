@@ -1,1 +1,0 @@
-Error: Failed to load custom Reporter from text-summary

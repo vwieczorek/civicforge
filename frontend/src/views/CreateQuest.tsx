@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { apiClient } from '../api/client';
 
 interface QuestFormData {
@@ -74,11 +75,22 @@ const CreateQuest: React.FC = () => {
       setIsSubmitting(true);
       const response = await apiClient.post<{ questId: string }>('/api/v1/quests', formData);
       
+      // Show success message
+      toast.success('Quest created successfully!');
+      
+      // Reset form
+      setFormData({
+        title: '',
+        description: '',
+        rewardXp: 100,
+        rewardReputation: 10,
+      });
+      
       // Navigate to the newly created quest
       navigate(`/quests/${response.questId}`);
     } catch (err) {
       console.error('Failed to create quest:', err);
-      alert('Failed to create quest. Please try again.');
+      toast.error('Failed to create quest. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,7 +105,7 @@ const CreateQuest: React.FC = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="quest-form">
+      <form onSubmit={handleSubmit} className="quest-form" noValidate>
         <div className="form-group">
           <label htmlFor="title">Quest Title</label>
           <input
@@ -136,7 +148,7 @@ const CreateQuest: React.FC = () => {
               type="number"
               id="rewardXp"
               name="rewardXp"
-              value={formData.rewardXp.toString()}
+              value={formData.rewardXp || ''}
               onChange={handleInputChange}
               min="10"
               max="10000"
@@ -153,7 +165,7 @@ const CreateQuest: React.FC = () => {
               type="number"
               id="rewardReputation"
               name="rewardReputation"
-              value={formData.rewardReputation.toString()}
+              value={formData.rewardReputation || ''}
               onChange={handleInputChange}
               min="1"
               max="100"

@@ -3,7 +3,7 @@
  * Tests the critical user flow of creating a quest
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import CreateQuest from '../CreateQuest';
@@ -45,7 +45,9 @@ describe('CreateQuest - Critical User Flow', () => {
     await user.click(submitButton);
 
     // Should not navigate
-    expect(mockNavigate).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   it('validates minimum XP requirement', async () => {
@@ -67,7 +69,7 @@ describe('CreateQuest - Critical User Flow', () => {
     await user.click(screen.getByRole('button', { name: /create quest/i }));
 
     // Should show validation error
-    expect(await screen.findByText(/XP must be at least 10/i)).toBeInTheDocument();
+    expect(await screen.findByText(/XP reward must be at least 10/i)).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -104,6 +106,18 @@ describe('CreateQuest - Critical User Flow', () => {
 
   it('shows loading state during submission', async () => {
     const user = userEvent.setup();
+    
+    // Mock a delayed response to ensure we can see the loading state
+    const { server } = await import('../../mocks/server');
+    const { http, HttpResponse } = await import('msw');
+    
+    server.use(
+      http.post('http://localhost:3001/api/v1/quests', async () => {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return HttpResponse.json({ questId: 'quest-999' }, { status: 201 });
+      })
+    );
+    
     render(
       <MemoryRouter>
         <CreateQuest />
@@ -115,12 +129,17 @@ describe('CreateQuest - Critical User Flow', () => {
     await user.type(screen.getByLabelText(/description/i), newQuest.description);
 
     const submitButton = screen.getByRole('button', { name: /create quest/i });
+    
+    // Click and immediately check loading state
     await user.click(submitButton);
-
-    // Button should show loading state
+    
+    // The button should immediately show loading state
     expect(submitButton).toBeDisabled();
+    expect(submitButton).toHaveTextContent(/creating/i);
+
+    // Wait for navigation to complete the test cleanly
     await waitFor(() => {
-      expect(submitButton).toHaveTextContent(/creating/i);
+      expect(mockNavigate).toHaveBeenCalled();
     });
   });
 

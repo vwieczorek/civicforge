@@ -9,17 +9,50 @@ provider:
   region: ${opt:region, 'us-east-1'}
   
   httpApi:
+    # Cognito JWT Authorizer configuration
+    authorizers:
+      cognitoJwtAuthorizer:
+        type: jwt
+        issuerUrl: https://cognito-idp.${self:provider.region}.amazonaws.com/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
+        audience:
+          - ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
+    # Apply authorizer by default to all endpoints
+    authorizer: cognitoJwtAuthorizer
+    # CORS configuration for frontend integration
+    cors:
+      allowedOrigins:
+        - ${ssm:/civicforge/${self:provider.stage}/frontend-url, 'http://localhost:5173'}
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+      allowCredentials: true
     throttle:
       rateLimit: 100  # requests per second
       burstLimit: 200  # burst capacity
   
+  # Enable AWS X-Ray tracing for better observability
+  tracing:
+    lambda: true
+    apiGateway: true
+  
   environment:
     COGNITO_REGION: ${self:provider.region}
-    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
-    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
+    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id~true}
+    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id~true}
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
     FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
+    IDEMPOTENCY_TABLE: ${self:service}-${self:provider.stage}-idempotency
+    SERVICE_NAME: ${self:service}
+    STAGE: ${self:provider.stage}
+    LOG_LEVEL: ${env:LOG_LEVEL, 'INFO'}
+    POWERTOOLS_SERVICE_NAME: ${self:service}
+    POWERTOOLS_METRICS_NAMESPACE: CivicForge/${self:provider.stage}
     FRONTEND_URL: ${ssm:/civicforge/${self:provider.stage}/frontend-url, 'http://localhost:5173'}
     # Feature flags
     FF_REWARD_DISTRIBUTION: ${env:FF_REWARD_DISTRIBUTION, 'false'}
@@ -36,6 +69,28 @@ provider:
             - logs:CreateLogStream
             - logs:PutLogEvents
           Resource: "arn:aws:logs:${self:provider.region}:${aws:accountId}:log-group:/aws/lambda/${self:service}-${self:provider.stage}-*:*"
+        # X-Ray tracing permissions
+        - Effect: Allow
+          Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+          Resource: "*"
+        # KMS permissions for decrypting SSM SecureString parameters
+        - Effect: Allow
+          Action:
+            - kms:Decrypt
+          Resource: "arn:aws:kms:${self:provider.region}:${aws:accountId}:alias/aws/ssm"
+          Condition:
+            StringEquals:
+              kms:ViaService: "ssm.${self:provider.region}.amazonaws.com"
+        # Idempotency table permissions for AWS Lambda Powertools
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:service}-${self:provider.stage}-idempotency"
 
 custom:
   usersTable: civicforge-${self:provider.stage}-users
@@ -52,10 +107,11 @@ functions:
   api:
     handler: handlers.api.handler
     events:
-      # Health check and general routes
+      # Health check (public endpoint - no authentication required)
       - httpApi:
           path: /health
           method: GET
+          authorizer: none
       - httpApi:
           path: /api/v1/quests
           method: GET
@@ -91,12 +147,22 @@ functions:
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}/index/*"
-      # Update permissions for quest operations
+      # Update permissions for quest operations - restricted to specific attributes
       - Effect: Allow
         Action:
           - dynamodb:UpdateItem
         Resource:
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.questsTable}"
+        Condition:
+          ForAllValues:StringEquals:
+            "dynamodb:Attributes":
+              - "status"
+              - "performerId"
+              - "claimedAt"
+              - "submissionText"
+              - "submittedAt"
+              - "disputeReason"
+              - "updatedAt"
       # Restricted UpdateItem on UsersTable - only allow wallet address updates
       - Effect: Allow
         Action:
@@ -173,7 +239,7 @@ functions:
         Condition:
           ForAllValues:StringEquals:
             "dynamodb:Attributes":
-              - "xp"
+              - "experience"
               - "reputation"
               - "questCreationPoints"
               - "processedRewardIds"
@@ -226,7 +292,7 @@ functions:
           - "dynamodb:PutItem"
           - "dynamodb:GetItem"
         Resource:
-          - "arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}"
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
     onError: !GetAtt UserCreationDLQ.Arn
   
   # DLQ Re-processor for failed rewards
@@ -264,7 +330,7 @@ functions:
         Condition:
           ForAllValues:StringEquals:
             "dynamodb:Attributes":
-              - "xp"
+              - "experience"
               - "reputation"
               - "questCreationPoints"
               - "processedRewardIds"
@@ -365,6 +431,30 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
     
+    # Idempotency table for AWS Lambda Powertools
+    IdempotencyTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-idempotency
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expiration
+          Enabled: true
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: alias/aws/dynamodb
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    
     # Dead Letter Queue for failed user creation attempts
     UserCreationDLQ:
       Type: AWS::SQS::Queue
@@ -372,6 +462,7 @@ resources:
         QueueName: ${self:service}-${self:provider.stage}-user-creation-dlq
         MessageRetentionPeriod: 1209600  # 14 days
         VisibilityTimeout: 60
+        SqsManagedSseEnabled: true  # Enable SSE with AWS-managed key
     
     # CloudWatch Alarm for DLQ monitoring
     UserCreationDLQAlarm:
@@ -429,5 +520,333 @@ resources:
         Period: 300  # 5 minutes
         EvaluationPeriods: 1
         Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Alarm for stuck messages in User Creation DLQ
+    UserCreationDLQStaleMessagesAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:provider.stage}-UserCreationDLQ-StaleMsgs
+        AlarmDescription: "Alert when messages are stuck in User Creation DLQ"
+        MetricName: ApproximateAgeOfOldestMessage
+        Namespace: AWS/SQS
+        Dimensions:
+          - Name: QueueName
+            Value: !GetAtt UserCreationDLQ.QueueName
+        Statistic: Maximum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 3600  # 1 hour
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Performance Monitoring Alarms for Lambda Functions
+    
+    # API Function Performance Alarms
+    ApiDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-duration
+        AlarmDescription: "Alert when API Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 3000  # 3 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    ApiThrottlesAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-throttles
+        AlarmDescription: "Alert when API Lambda is being throttled"
+        MetricName: Throttles
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    ApiConcurrentExecutionsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-concurrent-executions
+        AlarmDescription: "Alert when API Lambda concurrent executions are high"
+        MetricName: ConcurrentExecutions
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Maximum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 900  # 90% of default 1000 limit
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    ApiErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-api-function-errors
+        AlarmDescription: "Alert when API Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-api
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # CreateQuest Function Performance Alarms
+    CreateQuestDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createQuest-duration
+        AlarmDescription: "Alert when CreateQuest Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createQuest
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 2000  # 2 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    CreateQuestErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createQuest-errors
+        AlarmDescription: "Alert when CreateQuest Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createQuest
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # AttestQuest Function Performance Alarms
+    AttestQuestDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-attestQuest-duration
+        AlarmDescription: "Alert when AttestQuest Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-attestQuest
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 2000  # 2 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    AttestQuestErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-attestQuest-errors
+        AlarmDescription: "Alert when AttestQuest Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-attestQuest
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # DeleteQuest Function Performance Alarms
+    DeleteQuestDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-deleteQuest-duration
+        AlarmDescription: "Alert when DeleteQuest Lambda P95 duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-deleteQuest
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 2000  # 2 seconds
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    DeleteQuestErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-deleteQuest-errors
+        AlarmDescription: "Alert when DeleteQuest Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-deleteQuest
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # CreateUserTrigger Function Performance Alarms
+    CreateUserTriggerDurationAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createUserTrigger-duration
+        AlarmDescription: "Alert when CreateUserTrigger Lambda duration exceeds threshold"
+        MetricName: Duration
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createUserTrigger
+        Statistic: Average
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 1000  # 1 second
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    CreateUserTriggerErrorsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-createUserTrigger-errors
+        AlarmDescription: "Alert when CreateUserTrigger Lambda has errors"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createUserTrigger
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 3
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Security Monitoring Alarms
+    
+    AuthenticationFailuresAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-auth-failures
+        AlarmDescription: "Alert on high authentication failure rate"
+        MetricName: AuthenticationFailures
+        Namespace: ${self:service}/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    RateLimitExceededAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-rate-limit-exceeded
+        AlarmDescription: "Alert when rate limits are frequently exceeded"
+        MetricName: RateLimitExceeded
+        Namespace: ${self:service}/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 50
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # DynamoDB Throttling Alarms
+    
+    QuestsTableThrottleAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-quests-table-throttle
+        AlarmDescription: "Alert when Quests table is being throttled"
+        MetricName: ConsumedReadCapacityUnits
+        Namespace: AWS/DynamoDB
+        Dimensions:
+          - Name: TableName
+            Value: ${self:custom.questsTableName}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 80  # 80% of provisioned capacity
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    UsersTableThrottleAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-users-table-throttle
+        AlarmDescription: "Alert when Users table is being throttled"
+        MetricName: ConsumedReadCapacityUnits
+        Namespace: AWS/DynamoDB
+        Dimensions:
+          - Name: TableName
+            Value: ${self:custom.usersTableName}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 80  # 80% of provisioned capacity
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Suspicious Activity Alarms
+    
+    UnusualAPIActivityAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-unusual-api-activity
+        AlarmDescription: "Alert on unusual API activity patterns"
+        MetricName: 4XXError
+        Namespace: AWS/ApiGateway
+        Dimensions:
+          - Name: ApiName
+            Value: ${self:provider.stage}-${self:service}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 100
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    InvalidTokenAttemptsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-invalid-token-attempts
+        AlarmDescription: "Alert on high number of invalid token attempts"
+        MetricName: InvalidTokenAttempts
+        Namespace: ${self:service}/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 20
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching

@@ -14,7 +14,7 @@ from botocore.exceptions import ClientError
 @pytest.mark.asyncio
 async def test_claim_open_quest_succeeds():
     """Test successful claim of an open quest."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     # Mock the DynamoDB client's get_resource method
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
@@ -41,7 +41,7 @@ async def test_claim_open_quest_succeeds():
 @pytest.mark.asyncio
 async def test_claim_already_claimed_quest_fails():
     """Test that claiming an already claimed quest fails."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -62,7 +62,7 @@ async def test_claim_already_claimed_quest_fails():
 @pytest.mark.asyncio
 async def test_claim_quest_unexpected_error_raises():
     """Test that unexpected errors are propagated."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -84,7 +84,7 @@ async def test_claim_quest_unexpected_error_raises():
 @pytest.mark.asyncio
 async def test_submit_claimed_quest_succeeds():
     """Test successful submission of a claimed quest."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -111,7 +111,7 @@ async def test_submit_claimed_quest_succeeds():
 @pytest.mark.asyncio
 async def test_submit_by_wrong_user_fails():
     """Test that submission by wrong user fails."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -135,7 +135,7 @@ async def test_submit_by_wrong_user_fails():
 @pytest.mark.asyncio
 async def test_add_first_attestation_succeeds():
     """Test adding the first attestation."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -166,7 +166,7 @@ async def test_add_first_attestation_succeeds():
 @pytest.mark.asyncio
 async def test_add_duplicate_attestation_fails():
     """Test that duplicate attestation fails."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -193,7 +193,7 @@ async def test_add_duplicate_attestation_fails():
 @pytest.mark.asyncio
 async def test_add_attestation_to_wrong_state_fails():
     """Test that attestation to wrong state fails."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -221,7 +221,7 @@ async def test_add_attestation_to_wrong_state_fails():
 @pytest.mark.asyncio
 async def test_add_attestation_serialization():
     """Test that attestation data is properly serialized."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -262,7 +262,7 @@ async def test_add_attestation_serialization():
 @pytest.mark.asyncio
 async def test_claim_quest_validation_error():
     """Test that validation errors are handled properly."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -286,7 +286,7 @@ async def test_claim_quest_validation_error():
 @pytest.mark.asyncio
 async def test_complete_quest_atomic_succeeds():
     """Test completing a quest atomically."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
@@ -309,7 +309,7 @@ async def test_complete_quest_atomic_succeeds():
 @pytest.mark.asyncio
 async def test_complete_quest_not_submitted_fails():
     """Test that completing a non-submitted quest fails."""
-    from src.db import DynamoDBClient
+    from src.db import get_db_client, DynamoDBClient
     
     with patch.object(DynamoDBClient, 'get_resource') as mock_get_resource:
         mock_dynamodb = MagicMock()
