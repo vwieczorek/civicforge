@@ -29,26 +29,43 @@ Added exclusions for:
 - Frontend already has `.env.example` with placeholders
 - Backend uses `.env.test` for test configuration only
 
+## Actions Completed
+
+### Environment Files Removed
+- ✅ Deleted `frontend/.env` and `frontend/.env.development` from filesystem
+- ✅ Verified files were never committed to repository (only existed locally)
+- ✅ Updated `.gitignore` to exclude these files
+
+### Credential Rotation Scripts Created
+- ✅ Created `scripts/rotate_cognito_credentials.sh` - Automated credential rotation
+- ✅ Created `scripts/clean_git_history.sh` - Git history cleanup guide
+
 ## Remaining Actions Required
 
-### CRITICAL - Before Public Release:
+### CRITICAL - Execute Credential Rotation:
 
-1. **Remove Exposed Cognito Credentials**
+1. **Run Cognito Rotation Script**
    ```bash
-   # Remove the committed .env files from frontend
-   git rm frontend/.env frontend/.env.development
-   git commit -m "Remove exposed environment files"
+   ./scripts/rotate_cognito_credentials.sh dev us-east-1
+   ```
+   This will:
+   - Create new App Client ID
+   - Update SSM parameters
+   - Delete old App Client
+   - Create new `.env.local` file
+
+2. **Clean Git History** (ONLY if credentials were previously committed)
+   ```bash
+   # First check if cleanup is needed:
+   git grep -i "us-east-1_wKpnasV5v" $(git rev-list --all)
+   
+   # If found, follow instructions in:
+   ./scripts/clean_git_history.sh
    ```
 
-2. **Rotate AWS Cognito Credentials**
-   - The exposed credentials in `frontend/.env` must be rotated
-   - Create new Cognito User Pool or update client ID
-
-3. **Clean Git History** (if making repository public)
-   ```bash
-   # Use BFG Repo-Cleaner or git filter-branch to remove sensitive files from history
-   # This is destructive - backup first!
-   ```
+3. **Redeploy Services**
+   - Backend: `serverless deploy --stage dev`
+   - Update frontend deployments with new credentials
 
 ### For Production Deployment:
 
