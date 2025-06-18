@@ -30,7 +30,8 @@ async def create_quest(
     logger.info("Creating new quest", extra={
         "user_id": user_id,
         "quest_title": quest.title,
-        "reward": quest.reward
+        "reward_xp": quest.rewardXp,
+        "reward_reputation": quest.rewardReputation
     })
     
     # Check if user has enough points (anti-spam)
@@ -82,7 +83,8 @@ async def create_quest(
         "quest_id": new_quest.questId,
         "creator_id": user_id,
         "title": new_quest.title,
-        "reward": new_quest.reward
+        "reward_xp": new_quest.rewardXp,
+        "reward_reputation": new_quest.rewardReputation
     })
     
     return new_quest
