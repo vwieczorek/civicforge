@@ -11,6 +11,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Import security metrics
+try:
+    from .utils.security_metrics import record_rate_limit_exceeded
+except ImportError:
+    def record_rate_limit_exceeded(user_id=None, endpoint=None):
+        logger.warning(f"Rate limit exceeded: user={user_id}, endpoint={endpoint}")
+
 async def key_func(request: Request) -> str:
     """
     Rate limit by IP address to prevent user-specific DoS attacks.
@@ -29,12 +36,22 @@ limiter = Limiter(key_func=key_func)
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """Custom handler for rate limit exceeded errors"""
     response = exc.detail
+    
+    # Try to extract user ID from request if available
+    user_id = None
+    if hasattr(request.state, 'user_id'):
+        user_id = request.state.user_id
+    
+    # Record security metric
+    record_rate_limit_exceeded(user_id=user_id, endpoint=request.url.path)
+    
     logger.warning(
         f"Rate limit exceeded for {request.client.host}: {response}",
         extra={
             "ip": request.client.host,
             "path": request.url.path,
-            "method": request.method
+            "method": request.method,
+            "user_id": user_id
         }
     )
     return JSONResponse(

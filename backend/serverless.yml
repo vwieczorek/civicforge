@@ -47,6 +47,7 @@ provider:
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
     FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
+    IDEMPOTENCY_TABLE: ${self:service}-${self:provider.stage}-idempotency
     SERVICE_NAME: ${self:service}
     STAGE: ${self:provider.stage}
     LOG_LEVEL: ${env:LOG_LEVEL, 'INFO'}
@@ -82,6 +83,14 @@ provider:
           Condition:
             StringEquals:
               kms:ViaService: "ssm.${self:provider.region}.amazonaws.com"
+        # Idempotency table permissions for AWS Lambda Powertools
+        - Effect: Allow
+          Action:
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:service}-${self:provider.stage}-idempotency"
 
 custom:
   usersTable: civicforge-${self:provider.stage}-users
@@ -422,6 +431,30 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
     
+    # Idempotency table for AWS Lambda Powertools
+    IdempotencyTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-idempotency
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: expiration
+          Enabled: true
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: alias/aws/dynamodb
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    
     # Dead Letter Queue for failed user creation attempts
     UserCreationDLQ:
       Type: AWS::SQS::Queue
@@ -716,5 +749,104 @@ resources:
         Period: 300  # 5 minutes
         EvaluationPeriods: 1
         Threshold: 3
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Security Monitoring Alarms
+    
+    AuthenticationFailuresAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-auth-failures
+        AlarmDescription: "Alert on high authentication failure rate"
+        MetricName: AuthenticationFailures
+        Namespace: ${self:service}/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    RateLimitExceededAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-rate-limit-exceeded
+        AlarmDescription: "Alert when rate limits are frequently exceeded"
+        MetricName: RateLimitExceeded
+        Namespace: ${self:service}/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 50
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # DynamoDB Throttling Alarms
+    
+    QuestsTableThrottleAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-quests-table-throttle
+        AlarmDescription: "Alert when Quests table is being throttled"
+        MetricName: ConsumedReadCapacityUnits
+        Namespace: AWS/DynamoDB
+        Dimensions:
+          - Name: TableName
+            Value: ${self:custom.questsTableName}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 80  # 80% of provisioned capacity
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    UsersTableThrottleAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-users-table-throttle
+        AlarmDescription: "Alert when Users table is being throttled"
+        MetricName: ConsumedReadCapacityUnits
+        Namespace: AWS/DynamoDB
+        Dimensions:
+          - Name: TableName
+            Value: ${self:custom.usersTableName}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 80  # 80% of provisioned capacity
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Suspicious Activity Alarms
+    
+    UnusualAPIActivityAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-unusual-api-activity
+        AlarmDescription: "Alert on unusual API activity patterns"
+        MetricName: 4XXError
+        Namespace: AWS/ApiGateway
+        Dimensions:
+          - Name: ApiName
+            Value: ${self:provider.stage}-${self:service}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 2
+        Threshold: 100
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    InvalidTokenAttemptsAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-invalid-token-attempts
+        AlarmDescription: "Alert on high number of invalid token attempts"
+        MetricName: InvalidTokenAttempts
+        Namespace: ${self:service}/${self:provider.stage}
+        Statistic: Sum
+        Period: 300  # 5 minutes
+        EvaluationPeriods: 1
+        Threshold: 20
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching

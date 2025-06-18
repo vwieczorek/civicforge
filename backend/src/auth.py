@@ -16,6 +16,17 @@ from cachetools import cached, TTLCache
 # Configure logger
 logger = logging.getLogger(__name__)
 
+# Import security metrics
+try:
+    from .utils.security_metrics import record_authentication_failure, record_invalid_token_attempt
+except ImportError:
+    # Fallback if metrics not available
+    def record_authentication_failure(user_id=None, reason="unknown"):
+        logger.warning(f"Auth failure: {reason}, user: {user_id}")
+    
+    def record_invalid_token_attempt(token_type="unknown", error=None):
+        logger.warning(f"Invalid token: {token_type}, error: {error}")
+
 # Configuration
 COGNITO_REGION = os.environ.get("COGNITO_REGION", "us-east-1")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID")
@@ -100,6 +111,7 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
         # Validate token_use claim
         token_use = payload.get("token_use")
         if token_use != expected_token_use:
+            record_invalid_token_attempt(token_type="jwt", error=f"wrong_token_use:{token_use}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authentication failed"
@@ -108,11 +120,13 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
         return payload
         
     except jwt.ExpiredSignatureError:
+        record_invalid_token_attempt(token_type="jwt", error="expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed"
         )
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        record_invalid_token_attempt(token_type="jwt", error=str(type(e).__name__))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed"
@@ -120,6 +134,7 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
     except Exception as e:
         # Log the actual error for debugging purposes
         logger.error(f"An unexpected error occurred during token verification: {e}", exc_info=True)
+        record_authentication_failure(reason="unexpected_error")
         # Catch any other exceptions to prevent information leakage
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
