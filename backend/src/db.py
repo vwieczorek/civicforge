@@ -6,7 +6,7 @@ import os
 import uuid
 import logging
 from datetime import datetime, date
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from contextlib import asynccontextmanager
 
 from aiobotocore.session import get_session
@@ -38,9 +38,17 @@ class DynamoDBClient:
         endpoint_url = os.environ.get('DYNAMODB_ENDPOINT_URL')
         kwargs = {
             'region_name': os.environ.get('AWS_REGION', 'us-east-1'),
-            'aws_access_key_id': os.environ.get('AWS_ACCESS_KEY_ID', 'testing'),
-            'aws_secret_access_key': os.environ.get('AWS_SECRET_ACCESS_KEY', 'testing')
         }
+        
+        # For local development with DynamoDB Local, these might be set.
+        # In production, IAM roles should be used, and these will not be set.
+        aws_access_key_id = os.environ.get('AWS_ACCESS_KEY_ID')
+        aws_secret_access_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
+        
+        if aws_access_key_id:
+            kwargs['aws_access_key_id'] = aws_access_key_id
+        if aws_secret_access_key:
+            kwargs['aws_secret_access_key'] = aws_secret_access_key
         if endpoint_url:
             kwargs['endpoint_url'] = endpoint_url
         
@@ -227,7 +235,8 @@ class DynamoDBClient:
                 while True:
                     params = {
                         'TableName': self.failed_rewards_table_name,
-                        'FilterExpression': '#s = :status',
+                        'IndexName': 'status-createdAt-index',
+                        'KeyConditionExpression': '#s = :status',
                         'ExpressionAttributeNames': {'#s': 'status'},
                         'ExpressionAttributeValues': {':status': {'S': 'pending'}}
                     }
@@ -235,7 +244,7 @@ class DynamoDBClient:
                     if last_evaluated_key:
                         params['ExclusiveStartKey'] = last_evaluated_key
                     
-                    response = await dynamodb.scan(**params)
+                    response = await dynamodb.query(**params)
                     
                     items.extend([self._deserialize_item(item) for item in response.get('Items', [])])
                     
@@ -395,117 +404,99 @@ class DynamoDBClient:
             logger.error(f"Error scanning quests: {e}")
             raise
     
-    async def get_user_created_quests(self, user_id: str) -> List[QuestDB]:
-        """Get quests created by a user"""
+    async def get_user_created_quests(self, user_id: str, limit: int = 20, start_key: Optional[Dict] = None) -> Tuple[List[QuestDB], Optional[Dict]]:
+        """Get quests created by a user with proper pagination"""
         try:
-            items = []
-            last_evaluated_key = None
-            
             async with self.get_resource() as dynamodb:
                 # Try to use GSI first
                 try:
-                    while True:
-                        params = {
-                            'TableName': self.quests_table_name,
-                            'IndexName': 'CreatorIndex',
-                            'KeyConditionExpression': 'creatorId = :uid',
-                            'ExpressionAttributeValues': {':uid': {'S': user_id}},
-                            'ScanIndexForward': False
-                        }
-                        if last_evaluated_key:
-                            params['ExclusiveStartKey'] = last_evaluated_key
-                        
-                        response = await dynamodb.query(**params)
-                        items.extend([self._deserialize_item(item) for item in response.get('Items', [])])
-                        
-                        last_evaluated_key = response.get('LastEvaluatedKey')
-                        if not last_evaluated_key:
-                            break
+                    params = {
+                        'TableName': self.quests_table_name,
+                        'IndexName': 'CreatorIndex',
+                        'KeyConditionExpression': 'creatorId = :uid',
+                        'ExpressionAttributeValues': {':uid': {'S': user_id}},
+                        'ScanIndexForward': False,
+                        'Limit': limit
+                    }
+                    if start_key:
+                        params['ExclusiveStartKey'] = start_key
+                    
+                    response = await dynamodb.query(**params)
+                    items = [self._deserialize_item(item) for item in response.get('Items', [])]
+                    last_evaluated_key = response.get('LastEvaluatedKey')
+                    
+                    return [QuestDB(**item) for item in items], last_evaluated_key
                             
                 except ClientError as e:
                     if 'ResourceNotFoundException' in str(e):
-                        # GSI doesn't exist, fall back to scan
+                        # GSI doesn't exist, fall back to scan with pagination
                         logger.warning("CreatorIndex GSI not found, falling back to scan")
-                        items = []
-                        last_evaluated_key = None
                         
-                        while True:
-                            params = {
-                                'TableName': self.quests_table_name,
-                                'FilterExpression': 'creatorId = :uid',
-                                'ExpressionAttributeValues': {':uid': {'S': user_id}}
-                            }
-                            if last_evaluated_key:
-                                params['ExclusiveStartKey'] = last_evaluated_key
-                            
-                            response = await dynamodb.scan(**params)
-                            items.extend([self._deserialize_item(item) for item in response.get('Items', [])])
-                            
-                            last_evaluated_key = response.get('LastEvaluatedKey')
-                            if not last_evaluated_key:
-                                break
+                        params = {
+                            'TableName': self.quests_table_name,
+                            'FilterExpression': 'creatorId = :uid',
+                            'ExpressionAttributeValues': {':uid': {'S': user_id}},
+                            'Limit': limit
+                        }
+                        if start_key:
+                            params['ExclusiveStartKey'] = start_key
+                        
+                        response = await dynamodb.scan(**params)
+                        items = [self._deserialize_item(item) for item in response.get('Items', [])]
+                        last_evaluated_key = response.get('LastEvaluatedKey')
+                        
+                        return [QuestDB(**item) for item in items], last_evaluated_key
                     else:
                         raise
-            
-            return [QuestDB(**item) for item in items]
             
         except ClientError as e:
             logger.error(f"Error getting user created quests: {e}")
             raise
     
-    async def get_user_performed_quests(self, user_id: str) -> List[QuestDB]:
-        """Get quests performed by a user"""
+    async def get_user_performed_quests(self, user_id: str, limit: int = 20, start_key: Optional[Dict] = None) -> Tuple[List[QuestDB], Optional[Dict]]:
+        """Get quests performed by a user with proper pagination"""
         try:
-            items = []
-            last_evaluated_key = None
-            
             async with self.get_resource() as dynamodb:
                 # Try to use GSI first
                 try:
-                    while True:
-                        params = {
-                            'TableName': self.quests_table_name,
-                            'IndexName': 'PerformerIndex',
-                            'KeyConditionExpression': 'performerId = :uid',
-                            'ExpressionAttributeValues': {':uid': {'S': user_id}},
-                            'ScanIndexForward': False
-                        }
-                        if last_evaluated_key:
-                            params['ExclusiveStartKey'] = last_evaluated_key
-                        
-                        response = await dynamodb.query(**params)
-                        items.extend([self._deserialize_item(item) for item in response.get('Items', [])])
-                        
-                        last_evaluated_key = response.get('LastEvaluatedKey')
-                        if not last_evaluated_key:
-                            break
+                    params = {
+                        'TableName': self.quests_table_name,
+                        'IndexName': 'PerformerIndex',
+                        'KeyConditionExpression': 'performerId = :uid',
+                        'ExpressionAttributeValues': {':uid': {'S': user_id}},
+                        'ScanIndexForward': False,
+                        'Limit': limit
+                    }
+                    if start_key:
+                        params['ExclusiveStartKey'] = start_key
+                    
+                    response = await dynamodb.query(**params)
+                    items = [self._deserialize_item(item) for item in response.get('Items', [])]
+                    last_evaluated_key = response.get('LastEvaluatedKey')
+                    
+                    return [QuestDB(**item) for item in items], last_evaluated_key
                             
                 except ClientError as e:
                     if 'ResourceNotFoundException' in str(e):
-                        # GSI doesn't exist, fall back to scan
+                        # GSI doesn't exist, fall back to scan with pagination
                         logger.warning("PerformerIndex GSI not found, falling back to scan")
-                        items = []
-                        last_evaluated_key = None
                         
-                        while True:
-                            params = {
-                                'TableName': self.quests_table_name,
-                                'FilterExpression': 'performerId = :uid',
-                                'ExpressionAttributeValues': {':uid': {'S': user_id}}
-                            }
-                            if last_evaluated_key:
-                                params['ExclusiveStartKey'] = last_evaluated_key
-                            
-                            response = await dynamodb.scan(**params)
-                            items.extend([self._deserialize_item(item) for item in response.get('Items', [])])
-                            
-                            last_evaluated_key = response.get('LastEvaluatedKey')
-                            if not last_evaluated_key:
-                                break
+                        params = {
+                            'TableName': self.quests_table_name,
+                            'FilterExpression': 'performerId = :uid',
+                            'ExpressionAttributeValues': {':uid': {'S': user_id}},
+                            'Limit': limit
+                        }
+                        if start_key:
+                            params['ExclusiveStartKey'] = start_key
+                        
+                        response = await dynamodb.scan(**params)
+                        items = [self._deserialize_item(item) for item in response.get('Items', [])]
+                        last_evaluated_key = response.get('LastEvaluatedKey')
+                        
+                        return [QuestDB(**item) for item in items], last_evaluated_key
                     else:
                         raise
-            
-            return [QuestDB(**item) for item in items]
             
         except ClientError as e:
             logger.error(f"Error getting user performed quests: {e}")
@@ -513,39 +504,49 @@ class DynamoDBClient:
     
     async def get_user_stats(self, user_id: str) -> Dict[str, int]:
         """Get user statistics"""
-        try:
-            # Get the user
-            user = await self.get_user(user_id)
-            if not user:
-                return {
-                    'questsCreated': 0,
-                    'questsCompleted': 0,
-                    'experience': 0,
-                    'reputation': 0
-                }
-            
-            # Get created quests count
-            created_quests = await self.get_user_created_quests(user_id)
-            
-            # Get completed quests count
-            performed_quests = await self.get_user_performed_quests(user_id)
-            completed_count = sum(1 for q in performed_quests if q.status == QuestStatus.COMPLETE)
-            
-            return {
-                'questsCreated': len(created_quests),
-                'questsCompleted': completed_count,
-                'experience': user.experience,
-                'reputation': user.reputation
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting user stats: {e}")
+        # Get the user
+        user = await self.get_user(user_id)
+        if not user:
+            # This is an expected case, not an error.
             return {
                 'questsCreated': 0,
                 'questsCompleted': 0,
                 'experience': 0,
                 'reputation': 0
             }
+        
+        # Let other exceptions (like ClientError from DB calls) propagate
+        
+        # Fetch all created quests
+        # Note: For users with very large numbers of quests, consider implementing
+        # counters on the User item that are updated atomically
+        all_created_quests = []
+        created_start_key = None
+        while True:
+            quests, created_start_key = await self.get_user_created_quests(user_id, start_key=created_start_key)
+            all_created_quests.extend(quests)
+            if not created_start_key:
+                break
+
+        # Fetch all performed quests
+        all_performed_quests = []
+        performed_start_key = None
+        while True:
+            quests, performed_start_key = await self.get_user_performed_quests(user_id, start_key=performed_start_key)
+            all_performed_quests.extend(quests)
+            if not performed_start_key:
+                break
+
+        completed_count = sum(1 for q in all_performed_quests if q.status == QuestStatus.COMPLETE)
+        
+        # Note: For production, consider maintaining counters on the User item
+        # and updating them atomically when quests are created/completed
+        return {
+            'questsCreated': len(all_created_quests),
+            'questsCompleted': completed_count,
+            'experience': user.experience,
+            'reputation': user.reputation
+        }
     
     async def update_user_wallet(self, user_id: str, wallet_address: str) -> None:
         """Updates a user's wallet address"""

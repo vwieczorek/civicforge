@@ -9,6 +9,10 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+frontend/.env
+frontend/.env.development
 
 # Build outputs
 dist/
@@ -44,3 +48,10 @@ test-results.json
 
 # AWS
 .aws-sam/
+
+# Internal documentation
+.internal/
+HANDOVER.md
+SECURITY_AUDIT_*.md
+*_PLAN.md
+*_REPORT.md

@@ -4,6 +4,7 @@ JWT authentication with AWS Cognito
 
 import os
 import json
+import logging
 from typing import Dict
 import jwt
 from jwt.algorithms import RSAAlgorithm
@@ -11,6 +12,9 @@ from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
 from cachetools import cached, TTLCache
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 # Configuration
 COGNITO_REGION = os.environ.get("COGNITO_REGION", "us-east-1")
@@ -33,16 +37,19 @@ security = HTTPBearer()
 # Cache keys for 1 hour to handle key rotation
 cognito_keys_cache = TTLCache(maxsize=1, ttl=3600)
 
+# Create an async HTTP client with timeout
+_async_client = httpx.AsyncClient(timeout=5.0)
+
 
 @cached(cognito_keys_cache)
-def get_cognito_keys() -> Dict:
+async def get_cognito_keys() -> Dict:
     """Fetch and cache Cognito public keys with TTL"""
-    response = httpx.get(JWKS_URL)
+    response = await _async_client.get(JWKS_URL)
     response.raise_for_status()
     return response.json()
 
 
-async def verify_token(token: str, expected_token_use: str = "id") -> Dict:
+async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
     """Verify and decode a Cognito JWT token"""
     try:
         # Get the key ID from the token header
@@ -55,7 +62,7 @@ async def verify_token(token: str, expected_token_use: str = "id") -> Dict:
             )
         
         # Get the public key with retry mechanism
-        keys = get_cognito_keys()
+        keys = await get_cognito_keys()
         key = None
         for k in keys["keys"]:
             if k["kid"] == kid:
@@ -65,7 +72,7 @@ async def verify_token(token: str, expected_token_use: str = "id") -> Dict:
         if not key:
             # Try refreshing the keys cache in case of key rotation
             cognito_keys_cache.clear()
-            keys = get_cognito_keys()
+            keys = await get_cognito_keys()
             for k in keys["keys"]:
                 if k["kid"] == kid:
                     key = k
@@ -110,7 +117,9 @@ async def verify_token(token: str, expected_token_use: str = "id") -> Dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed"
         )
-    except Exception:
+    except Exception as e:
+        # Log the actual error for debugging purposes
+        logger.error(f"An unexpected error occurred during token verification: {e}", exc_info=True)
         # Catch any other exceptions to prevent information leakage
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -42,8 +42,8 @@ provider:
   
   environment:
     COGNITO_REGION: ${self:provider.region}
-    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
-    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
+    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id~true}
+    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id~true}
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
     FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
@@ -74,6 +74,14 @@ provider:
             - xray:PutTraceSegments
             - xray:PutTelemetryRecords
           Resource: "*"
+        # KMS permissions for decrypting SSM SecureString parameters
+        - Effect: Allow
+          Action:
+            - kms:Decrypt
+          Resource: "arn:aws:kms:${self:provider.region}:${aws:accountId}:alias/aws/ssm"
+          Condition:
+            StringEquals:
+              kms:ViaService: "ssm.${self:provider.region}.amazonaws.com"
 
 custom:
   usersTable: civicforge-${self:provider.stage}-users
@@ -222,7 +230,7 @@ functions:
         Condition:
           ForAllValues:StringEquals:
             "dynamodb:Attributes":
-              - "xp"
+              - "experience"
               - "reputation"
               - "questCreationPoints"
               - "processedRewardIds"
@@ -313,7 +321,7 @@ functions:
         Condition:
           ForAllValues:StringEquals:
             "dynamodb:Attributes":
-              - "xp"
+              - "experience"
               - "reputation"
               - "questCreationPoints"
               - "processedRewardIds"
@@ -421,6 +429,7 @@ resources:
         QueueName: ${self:service}-${self:provider.stage}-user-creation-dlq
         MessageRetentionPeriod: 1209600  # 14 days
         VisibilityTimeout: 60
+        SqsManagedSseEnabled: true  # Enable SSE with AWS-managed key
     
     # CloudWatch Alarm for DLQ monitoring
     UserCreationDLQAlarm:

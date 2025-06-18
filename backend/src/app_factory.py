@@ -12,6 +12,9 @@ from fastapi.responses import JSONResponse
 from datetime import datetime
 from typing import List
 
+from .rate_limiter import limiter, rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -41,6 +44,10 @@ def create_app(
         description=description,
         version="1.0.0"
     )
+    
+    # Add rate limiter to the app state
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
     # Configure CORS with specific headers (fixing the wildcard security issue)
     allowed_origins = os.environ.get("FRONTEND_URL", "http://localhost:5173").split(",")

@@ -333,7 +333,7 @@ class TestIdempotency:
         # Verify update was called with correct parameters
         call_args = mock_users_table.update_item.call_args
         assert call_args.kwargs['Key'] == {'userId': 'user-456'}
-        assert 'xp = xp + :xp' in call_args.kwargs['UpdateExpression']
+        assert 'experience = experience + :xp' in call_args.kwargs['UpdateExpression']
         assert 'reputation = reputation + :rep' in call_args.kwargs['UpdateExpression']
         assert 'processedRewardIds' in call_args.kwargs['UpdateExpression']
         

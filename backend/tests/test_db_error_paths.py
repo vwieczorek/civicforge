@@ -319,7 +319,7 @@ class TestFailedRewardRecovery:
         db_client.failed_rewards_table_name = "test-failed-rewards"
         
         mock_dynamodb_client = AsyncMock()
-        mock_dynamodb_client.scan.return_value = {
+        mock_dynamodb_client.query.return_value = {
             'Items': [
                 {
                     'rewardId': {'S': 'failure-1'},

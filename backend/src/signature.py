@@ -2,9 +2,12 @@
 Cryptographic signature verification for attestations
 """
 
+import logging
 from eth_account import Account
 from eth_account.messages import encode_defunct
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def create_attestation_message(quest_id: str, user_id: str, role: str) -> str:
@@ -57,7 +60,7 @@ def verify_attestation_signature(
         return recovered_address.lower() == expected_address.lower()
         
     except Exception as e:
-        print(f"Error verifying signature: {e}")
+        logger.error(f"Error verifying signature for address {expected_address}: {e}")
         return False
 
 
@@ -79,5 +82,5 @@ def extract_address_from_signature(
         recovered_address = Account.recover_message(encoded_message, signature=signature)
         return recovered_address
     except Exception as e:
-        print(f"Error extracting address from signature: {e}")
+        logger.error(f"Error extracting address from signature: {e}")
         return None

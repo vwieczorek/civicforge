@@ -2,8 +2,8 @@
 
 > A decentralized platform for community-driven civic engagement through dual-attestation quest completion
 
-[![Backend Tests](https://img.shields.io/badge/backend%20tests-261%20passing-brightgreen)]()
-[![Backend Coverage](https://img.shields.io/badge/backend%20coverage-88%25-brightgreen)]()
+[![Backend Tests](https://img.shields.io/badge/backend%20tests-201%20passing-brightgreen)]()
+[![Backend Coverage](https://img.shields.io/badge/backend%20coverage-73%25-brightgreen)]()
 [![Frontend Tests](https://img.shields.io/badge/frontend%20tests-96%20passing-brightgreen)]()
 [![Frontend Coverage](https://img.shields.io/badge/frontend%20coverage-71%25-brightgreen)]()
 [![Deployment](https://img.shields.io/badge/deployment-ready-brightgreen)]()

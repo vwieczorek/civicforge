@@ -18,6 +18,7 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 # Environment variables
+INITIAL_POINTS = int(os.environ.get("INITIAL_QUEST_CREATION_POINTS", "10"))
 USERS_TABLE = os.environ.get("USERS_TABLE_NAME")
 if not USERS_TABLE:
     raise ValueError("Missing required environment variable: USERS_TABLE_NAME")
@@ -57,7 +58,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'username': username,
             'reputation': 0,
             'experience': 0,
-            'questCreationPoints': 10,  # Default initial points - should match settings.initial_quest_creation_points
+            'questCreationPoints': INITIAL_POINTS,
             'createdAt': timestamp,
             'updatedAt': timestamp
         }

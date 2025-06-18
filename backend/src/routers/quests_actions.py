@@ -2,7 +2,7 @@
 Quest action operations router (claim, submit, dispute)
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
 import logging
 
@@ -10,6 +10,8 @@ from ..models import Quest, QuestStatus, QuestSubmission, QuestDispute
 from ..state_machine import QuestStateMachine
 from ..auth import get_current_user_id
 from ..db import get_db_client, DynamoDBClient
+from ..sanitizer import sanitize_submission_text, sanitize_dispute_reason
+from ..rate_limiter import limiter, RATE_LIMITS
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,9 @@ router = APIRouter(tags=["quests"])
 
 
 @router.post("/quests/{quest_id}/claim", response_model=Quest)
+@limiter.limit(RATE_LIMITS["claim_quest"])
 async def claim_quest(
+    request: Request,
     quest_id: str,
     user_id: str = Depends(get_current_user_id),
     db: DynamoDBClient = Depends(get_db_client)
@@ -62,7 +66,9 @@ async def claim_quest(
 
 
 @router.post("/quests/{quest_id}/submit", response_model=Quest)
+@limiter.limit(RATE_LIMITS["submit_quest"])
 async def submit_quest(
+    request: Request,
     quest_id: str,
     submission: QuestSubmission,
     user_id: str = Depends(get_current_user_id),
@@ -87,11 +93,14 @@ async def submit_quest(
                 detail="Only the assigned performer can submit work"
             )
     
+    # Sanitize submission text to prevent XSS
+    sanitized_text = sanitize_submission_text(submission.submissionText)
+    
     # Attempt atomic submission
     success = await db.submit_quest_atomic(
         quest_id, 
         user_id, 
-        submission.submissionText
+        sanitized_text
     )
     
     if not success:
@@ -114,18 +123,20 @@ async def submit_quest(
 
 
 @router.post("/quests/{quest_id}/dispute", response_model=Quest)
+@limiter.limit(RATE_LIMITS["dispute_quest"])
 async def dispute_quest(
+    request: Request,
     quest_id: str,
-    request: QuestDispute,
+    dispute: QuestDispute,
     user_id: str = Depends(get_current_user_id),
     db: DynamoDBClient = Depends(get_db_client)
 ) -> Quest:
     """Initiate dispute resolution for a quest"""
-    # The reason is already sanitized by the QuestDispute model
-    reason = request.reason
+    # Sanitize dispute reason to prevent XSS
+    sanitized_reason = sanitize_dispute_reason(dispute.reason)
     
     # Use atomic operation to prevent race conditions
-    success = await db.dispute_quest_atomic(quest_id, user_id, reason)
+    success = await db.dispute_quest_atomic(quest_id, user_id, sanitized_reason)
     
     if not success:
         raise HTTPException(
@@ -134,7 +145,7 @@ async def dispute_quest(
         )
     
     # In production, this would trigger notification to arbiters
-    logger.info(f"Dispute initiated for quest {quest_id} by user {user_id}: {reason}")
+    logger.info(f"Dispute initiated for quest {quest_id} by user {user_id}: {sanitized_reason}")
     
     # Return the updated quest
     quest = await db.get_quest(quest_id)

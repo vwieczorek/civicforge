@@ -2,7 +2,7 @@
 Quest attestation operations router
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from datetime import datetime
 import logging
 
@@ -12,6 +12,8 @@ from ..auth import get_current_user_id
 from ..db import get_db_client, DynamoDBClient
 from ..signature import verify_attestation_signature
 from ..feature_flags import feature_flags, FeatureFlag
+from ..sanitizer import sanitize_attestation_notes
+from ..rate_limiter import limiter, RATE_LIMITS
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,9 @@ router = APIRouter(tags=["quests"])
 
 
 @router.post("/quests/{quest_id}/attest", response_model=Quest)
+@limiter.limit(RATE_LIMITS["attest_quest"])
 async def attest_quest(
+    request: Request,
     quest_id: str,
     attestation_request: AttestationRequest,
     user_id: str = Depends(get_current_user_id),

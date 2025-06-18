@@ -17,7 +17,7 @@ router = APIRouter(tags=["quests"])
 
 @router.get("/quests", response_model=List[Quest])
 async def list_quests(
-    status: Optional[QuestStatus] = None,
+    status: QuestStatus,  # Required to avoid full table scans
     _: str = Depends(require_auth),
     db: DynamoDBClient = Depends(get_db_client)
 ) -> List[Quest]:

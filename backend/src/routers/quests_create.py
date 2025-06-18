@@ -2,7 +2,7 @@
 Quest creation operations router
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from datetime import datetime
 import uuid
 
@@ -11,13 +11,17 @@ from ..auth import get_current_user_id
 from ..db import get_db_client, DynamoDBClient
 from ..config import settings
 from ..logger import logger, tracer
+from ..rate_limiter import limiter, RATE_LIMITS
+from ..sanitizer import sanitize_quest_title, sanitize_quest_description
 
 router = APIRouter(tags=["quests"])
 
 
 @router.post("/quests", response_model=Quest, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMITS["create_quest"])
 @tracer.capture_method
 async def create_quest(
+    request: Request,
     quest: QuestCreate,
     user_id: str = Depends(get_current_user_id),
     db: DynamoDBClient = Depends(get_db_client)
@@ -65,6 +69,10 @@ async def create_quest(
     quest_data["attestations"] = []
     quest_data["createdAt"] = datetime.utcnow()
     quest_data["updatedAt"] = datetime.utcnow()
+    
+    # Explicitly sanitize user-provided content before saving
+    quest_data["title"] = sanitize_quest_title(quest_data["title"])
+    quest_data["description"] = sanitize_quest_description(quest_data["description"])
     
     # Create Quest object
     new_quest = Quest(**quest_data)
