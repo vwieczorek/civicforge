@@ -33,7 +33,7 @@ echo "🧪 Running tests before deployment..."
 if [ "$STAGE" = "dev" ]; then
     echo "📝 Running tests for dev environment (coverage check disabled)..."
     cd backend
-    python -m pytest tests/ -v --tb=short
+    python -m pytest tests/ -v --tb=short --override-ini="addopts=-v --tb=short"
     TEST_RESULT=$?
     cd ..
     
