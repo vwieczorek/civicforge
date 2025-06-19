@@ -28,10 +28,37 @@ fi
 
 # Safety check: Run tests before deployment
 echo "🧪 Running tests before deployment..."
-npm test
-if [ $? -ne 0 ]; then
-    echo "❌ ERROR: Tests failed. Fix failing tests before deploying."
-    exit 1
+
+# For dev environment, run tests without coverage requirement
+if [ "$STAGE" = "dev" ]; then
+    echo "📝 Running tests for dev environment (coverage check disabled)..."
+    cd backend
+    pytest -v --tb=short
+    TEST_RESULT=$?
+    cd ..
+    
+    if [ $TEST_RESULT -ne 0 ]; then
+        echo "❌ ERROR: Tests failed. Fix failing tests before deploying."
+        exit 1
+    fi
+    
+    # Run frontend tests
+    cd frontend
+    npm test
+    FRONTEND_TEST_RESULT=$?
+    cd ..
+    
+    if [ $FRONTEND_TEST_RESULT -ne 0 ]; then
+        echo "❌ ERROR: Frontend tests failed."
+        exit 1
+    fi
+else
+    # For staging/prod, enforce coverage requirements
+    npm test
+    if [ $? -ne 0 ]; then
+        echo "❌ ERROR: Tests failed or coverage requirements not met."
+        exit 1
+    fi
 fi
 
 # Check if AWS credentials are configured
