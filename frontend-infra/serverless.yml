@@ -89,12 +89,12 @@ resources:
           Enabled: true
           Comment: CivicForge Frontend Distribution - ${self:provider.stage}
           PriceClass: PriceClass_100  # Use only North America and Europe for cost optimization
-          Aliases:
-            - ${self:custom.domainName.${self:provider.stage}, ''}
-          ViewerCertificate:
-            AcmCertificateArn: ${self:custom.certificateArn.${self:provider.stage}, ''}
-            SslSupportMethod: sni-only
-            MinimumProtocolVersion: TLSv1.2_2021
+          # Aliases:
+          #   - ${self:custom.domainName.${self:provider.stage}, ''}
+          # ViewerCertificate:
+          #   AcmCertificateArn: ${self:custom.certificateArn.${self:provider.stage}, ''}
+          #   SslSupportMethod: sni-only
+          #   MinimumProtocolVersion: TLSv1.2_2021
 
     # S3 bucket policy to allow CloudFront OAC access
     FrontendBucketPolicy:
