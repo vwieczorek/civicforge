@@ -2,6 +2,16 @@ service: civicforge-frontend-infra
 
 frameworkVersion: '3'
 
+custom:
+  domainName:
+    dev: dev.civicforge.org
+    staging: staging.civicforge.org
+    prod: civicforge.org
+  certificateArn:
+    dev: arn:aws:acm:us-east-1:211125472754:certificate/b13d3702-b386-4343-936c-5e803c2bea77
+    staging: ${env:STAGING_CERT_ARN, ''}
+    prod: arn:aws:acm:us-east-1:211125472754:certificate/397fb212-db18-474f-b313-330d0fea2865
+
 provider:
   name: aws
   region: ${opt:region, 'us-east-1'}
@@ -79,6 +89,12 @@ resources:
           Enabled: true
           Comment: CivicForge Frontend Distribution - ${self:provider.stage}
           PriceClass: PriceClass_100  # Use only North America and Europe for cost optimization
+          Aliases:
+            - ${self:custom.domainName.${self:provider.stage}, ''}
+          ViewerCertificate:
+            AcmCertificateArn: ${self:custom.certificateArn.${self:provider.stage}, ''}
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
 
     # S3 bucket policy to allow CloudFront OAC access
     FrontendBucketPolicy:
