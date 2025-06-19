@@ -11,7 +11,7 @@ from jwt.algorithms import RSAAlgorithm
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
-from cachetools import cached, TTLCache
+from cachetools import TTLCache
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -52,12 +52,23 @@ cognito_keys_cache = TTLCache(maxsize=1, ttl=3600)
 _async_client = httpx.AsyncClient(timeout=5.0)
 
 
-@cached(cognito_keys_cache)
 async def get_cognito_keys() -> Dict:
     """Fetch and cache Cognito public keys with TTL"""
+    # Manual caching for async function
+    cache_key = "cognito_keys"
+    
+    # Check if keys are in cache
+    if cache_key in cognito_keys_cache:
+        return cognito_keys_cache[cache_key]
+    
+    # Fetch keys if not in cache
     response = await _async_client.get(JWKS_URL)
     response.raise_for_status()
-    return response.json()
+    keys = response.json()
+    
+    # Store in cache
+    cognito_keys_cache[cache_key] = keys
+    return keys
 
 
 async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
@@ -146,6 +157,11 @@ async def get_current_user_claims(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ) -> Dict:
     """Get the current user's claims from the JWT token"""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed"
+        )
     token = credentials.credentials
     return await verify_token(token)
 
@@ -168,4 +184,9 @@ async def require_auth(
     credentials: HTTPAuthorizationCredentials = Security(security)
 ) -> Dict:
     """Require authentication for an endpoint"""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed"
+        )
     return await get_current_user_claims(credentials)

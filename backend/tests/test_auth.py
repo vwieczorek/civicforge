@@ -73,6 +73,7 @@ class TestGetCognitoKeys:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = SAMPLE_JWKS
+        mock_response.raise_for_status = MagicMock()  # Add missing method
         mock_client = AsyncMock()
         mock_client.get.return_value = mock_response
         mocker.patch("src.auth._async_client", mock_client)

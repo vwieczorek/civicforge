@@ -48,8 +48,8 @@ async def test_api_list_quests_integration(authenticated_client, dynamodb_tables
     create_response = creator_client.post("/api/v1/quests", json=quest_data)
     assert create_response.status_code == 201
     
-    # Now list quests
-    list_response = creator_client.get("/api/v1/quests")
+    # Now list quests - must provide status parameter
+    list_response = creator_client.get("/api/v1/quests?status=OPEN")
     assert list_response.status_code == 200
     
     quests = list_response.json()

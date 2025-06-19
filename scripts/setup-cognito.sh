@@ -20,12 +20,12 @@ USER_POOL_ID=$(aws cognito-idp create-user-pool \
   --region "$REGION" \
   --auto-verified-attributes email \
   --username-attributes email \
-  --password-policy MinimumLength=8,RequireUppercase=true,RequireLowercase=true,RequireNumbers=true,RequireSymbols=false \
+  --policies 'PasswordPolicy={MinimumLength=8,RequireUppercase=true,RequireLowercase=true,RequireNumbers=true,RequireSymbols=false}' \
   --user-attribute-update-settings AttributesRequireVerificationBeforeUpdate=email \
   --schema \
     Name=email,AttributeDataType=String,Required=true,Mutable=true \
     Name=name,AttributeDataType=String,Required=false,Mutable=true \
-    Name=custom:ethereum_address,AttributeDataType=String,Mutable=true,DeveloperOnlyAttribute=false \
+    Name=eth_address,AttributeDataType=String,Mutable=true,DeveloperOnlyAttribute=false \
   --query 'UserPool.Id' \
   --output text)
 
@@ -44,8 +44,8 @@ APP_CLIENT_ID=$(aws cognito-idp create-user-pool-client \
   --access-token-validity 60 \
   --id-token-validity 60 \
   --token-validity-units AccessToken=minutes,IdToken=minutes,RefreshToken=days \
-  --read-attributes email name custom:ethereum_address \
-  --write-attributes email name custom:ethereum_address \
+  --read-attributes email name custom:eth_address \
+  --write-attributes email name custom:eth_address \
   --explicit-auth-flows ALLOW_REFRESH_TOKEN_AUTH ALLOW_USER_SRP_AUTH \
   --prevent-user-existence-errors ENABLED \
   --query 'UserPoolClient.ClientId' \
