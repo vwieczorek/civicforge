@@ -93,8 +93,7 @@ custom:
   failedRewardsTable: civicforge-${self:provider.stage}-failed-rewards
   pythonRequirements:
     # Use Docker for Linux compatibility
-    dockerizePip: true
-    dockerImage: python:3.11-slim
+    dockerizePip: non-linux
     
     # Use deployment requirements file
     fileName: requirements-deploy.txt
