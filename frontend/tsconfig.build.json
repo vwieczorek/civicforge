@@ -1,10 +1,15 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
   "exclude": [
     "src/**/*.test.ts",
     "src/**/*.test.tsx",
     "src/**/__tests__/**",
     "src/test-utils.tsx",
-    "src/mocks/**"
+    "src/mocks/**",
+    "src/test/**"
   ]
 }

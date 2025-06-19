@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { createMockUser, createMockQuest, createMockQuestCollection } from '../test/mocks/factory';
-import { Quest, QuestStatus } from '../api/types';
+import { QuestStatus } from '../api/types';
 
 // Define the base URL to match the test setup configuration
 const API_BASE_URL = 'http://localhost:3001';
