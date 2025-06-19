@@ -44,7 +44,7 @@ if [ "$STAGE" = "dev" ]; then
     
     # Run frontend tests
     cd frontend
-    npm test
+    npx vitest run
     FRONTEND_TEST_RESULT=$?
     cd ..
     
