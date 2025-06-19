@@ -19,7 +19,7 @@ router = APIRouter(tags=["quests"])
 async def list_quests(
     status: QuestStatus,  # Required to avoid full table scans
     _: str = Depends(require_auth),
-    db: DynamoDBClient = Depends(get_db_client)
+    db: DynamoDBClient = Depends(get_db_client),
 ) -> List[Quest]:
     """List all quests, optionally filtered by status"""
     try:
@@ -34,7 +34,7 @@ async def list_quests(
 async def get_quest(
     quest_id: str,
     _: str = Depends(require_auth),
-    db: DynamoDBClient = Depends(get_db_client)
+    db: DynamoDBClient = Depends(get_db_client),
 ) -> Quest:
     """Get quest details"""
     quest = await db.get_quest(quest_id)

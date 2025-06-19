@@ -24,45 +24,57 @@ async def create_quest(
     request: Request,
     quest: QuestCreate,
     user_id: str = Depends(get_current_user_id),
-    db: DynamoDBClient = Depends(get_db_client)
+    db: DynamoDBClient = Depends(get_db_client),
 ) -> Quest:
     """Create a new quest"""
-    logger.info("Creating new quest", extra={
-        "user_id": user_id,
-        "quest_title": quest.title,
-        "reward_xp": quest.rewardXp,
-        "reward_reputation": quest.rewardReputation
-    })
-    
+    logger.info(
+        "Creating new quest",
+        extra={
+            "user_id": user_id,
+            "quest_title": quest.title,
+            "reward_xp": quest.rewardXp,
+            "reward_reputation": quest.rewardReputation,
+        },
+    )
+
     # Check if user has enough points (anti-spam)
     user = await db.get_user(user_id)
     if not user:
-        logger.warning("User not found during quest creation", extra={"user_id": user_id})
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.questCreationPoints < settings.quest_creation_cost:
-        logger.warning("Insufficient quest creation points", extra={
-            "user_id": user_id,
-            "available_points": user.questCreationPoints,
-            "required_points": settings.quest_creation_cost
-        })
-        raise HTTPException(
-            status_code=429, 
-            detail=f"Insufficient quest creation points. You have {user.questCreationPoints} but need {settings.quest_creation_cost}."
+        logger.warning(
+            "User not found during quest creation", extra={"user_id": user_id}
         )
-    
-    # Deduct points atomically
-    success = await db.deduct_quest_creation_points(user_id, settings.quest_creation_cost)
-    if not success:
-        logger.error("Failed to deduct quest creation points", extra={
-            "user_id": user_id,
-            "points_to_deduct": settings.quest_creation_cost
-        })
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.questCreationPoints < settings.quest_creation_cost:
+        logger.warning(
+            "Insufficient quest creation points",
+            extra={
+                "user_id": user_id,
+                "available_points": user.questCreationPoints,
+                "required_points": settings.quest_creation_cost,
+            },
+        )
         raise HTTPException(
             status_code=429,
-            detail="Unable to create quest. Please try again later."
+            detail=f"Insufficient quest creation points. You have {user.questCreationPoints} but need {settings.quest_creation_cost}.",
         )
-    
+
+    # Deduct points atomically
+    success = await db.deduct_quest_creation_points(
+        user_id, settings.quest_creation_cost
+    )
+    if not success:
+        logger.error(
+            "Failed to deduct quest creation points",
+            extra={
+                "user_id": user_id,
+                "points_to_deduct": settings.quest_creation_cost,
+            },
+        )
+        raise HTTPException(
+            status_code=429, detail="Unable to create quest. Please try again later."
+        )
+
     quest_data = quest.dict()
     quest_data["questId"] = str(uuid.uuid4())
     quest_data["creatorId"] = user_id
@@ -70,21 +82,24 @@ async def create_quest(
     quest_data["attestations"] = []
     quest_data["createdAt"] = datetime.utcnow()
     quest_data["updatedAt"] = datetime.utcnow()
-    
+
     # Explicitly sanitize user-provided content before saving
     quest_data["title"] = sanitize_quest_title(quest_data["title"])
     quest_data["description"] = sanitize_quest_description(quest_data["description"])
-    
+
     # Create Quest object
     new_quest = Quest(**quest_data)
     await db.create_quest(new_quest)
-    
-    logger.info("Quest created successfully", extra={
-        "quest_id": new_quest.questId,
-        "creator_id": user_id,
-        "title": new_quest.title,
-        "reward_xp": new_quest.rewardXp,
-        "reward_reputation": new_quest.rewardReputation
-    })
-    
+
+    logger.info(
+        "Quest created successfully",
+        extra={
+            "quest_id": new_quest.questId,
+            "creator_id": user_id,
+            "title": new_quest.title,
+            "reward_xp": new_quest.rewardXp,
+            "reward_reputation": new_quest.rewardReputation,
+        },
+    )
+
     return new_quest

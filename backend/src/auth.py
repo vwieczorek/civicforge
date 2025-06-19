@@ -18,14 +18,18 @@ logger = logging.getLogger(__name__)
 
 # Import security metrics
 try:
-    from .utils.security_metrics import record_authentication_failure, record_invalid_token_attempt
+    from .utils.security_metrics import (
+        record_authentication_failure,
+        record_invalid_token_attempt,
+    )
 except ImportError:
     # Fallback if metrics not available
     def record_authentication_failure(user_id=None, reason="unknown"):
         logger.warning(f"Auth failure: {reason}, user: {user_id}")
-    
+
     def record_invalid_token_attempt(token_type="unknown", error=None):
         logger.warning(f"Invalid token: {token_type}, error: {error}")
+
 
 # Configuration
 COGNITO_REGION = os.environ.get("COGNITO_REGION", "us-east-1")
@@ -39,7 +43,9 @@ if not COGNITO_APP_CLIENT_ID:
     raise ValueError("Missing required environment variable: COGNITO_APP_CLIENT_ID")
 
 # JWT validation
-COGNITO_ISSUER = f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+COGNITO_ISSUER = (
+    f"https://cognito-idp.{COGNITO_REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}"
+)
 JWKS_URL = f"{COGNITO_ISSUER}/.well-known/jwks.json"
 
 # Security scheme
@@ -56,16 +62,16 @@ async def get_cognito_keys() -> Dict:
     """Fetch and cache Cognito public keys with TTL"""
     # Manual caching for async function
     cache_key = "cognito_keys"
-    
+
     # Check if keys are in cache
     if cache_key in cognito_keys_cache:
         return cognito_keys_cache[cache_key]
-    
+
     # Fetch keys if not in cache
     response = await _async_client.get(JWKS_URL)
     response.raise_for_status()
     keys = response.json()
-    
+
     # Store in cache
     cognito_keys_cache[cache_key] = keys
     return keys
@@ -79,10 +85,9 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
         kid = unverified_header.get("kid")
         if not kid:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication failed"
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
             )
-        
+
         # Get the public key with retry mechanism
         keys = await get_cognito_keys()
         key = None
@@ -90,7 +95,7 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
             if k["kid"] == kid:
                 key = k
                 break
-        
+
         if not key:
             # Try refreshing the keys cache in case of key rotation
             cognito_keys_cache.clear()
@@ -99,16 +104,16 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
                 if k["kid"] == kid:
                     key = k
                     break
-            
+
             if not key:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Authentication failed"
+                    detail="Authentication failed",
                 )
-        
+
         # Construct the public key
         public_key = RSAAlgorithm.from_jwk(json.dumps(key))
-        
+
         # Verify and decode the token
         payload = jwt.decode(
             token,
@@ -116,77 +121,75 @@ async def verify_token(token: str, expected_token_use: str = "access") -> Dict:
             algorithms=["RS256"],
             issuer=COGNITO_ISSUER,
             audience=COGNITO_APP_CLIENT_ID,
-            options={"verify_exp": True}
+            options={"verify_exp": True},
         )
-        
+
         # Validate token_use claim
         token_use = payload.get("token_use")
         if token_use != expected_token_use:
-            record_invalid_token_attempt(token_type="jwt", error=f"wrong_token_use:{token_use}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication failed"
+            record_invalid_token_attempt(
+                token_type="jwt", error=f"wrong_token_use:{token_use}"
             )
-        
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
+            )
+
         return payload
-        
+
     except jwt.ExpiredSignatureError:
         record_invalid_token_attempt(token_type="jwt", error="expired")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
         )
     except jwt.InvalidTokenError as e:
         record_invalid_token_attempt(token_type="jwt", error=str(type(e).__name__))
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
         )
     except Exception as e:
         # Log the actual error for debugging purposes
-        logger.error(f"An unexpected error occurred during token verification: {e}", exc_info=True)
+        logger.error(
+            f"An unexpected error occurred during token verification: {e}",
+            exc_info=True,
+        )
         record_authentication_failure(reason="unexpected_error")
         # Catch any other exceptions to prevent information leakage
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
         )
 
 
 async def get_current_user_claims(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> Dict:
     """Get the current user's claims from the JWT token"""
     if not credentials:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
         )
     token = credentials.credentials
     return await verify_token(token)
 
 
 async def get_current_user_id(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> str:
     """Get the current user's ID (Cognito sub)"""
     claims = await get_current_user_claims(credentials)
     user_id = claims.get("sub")
     if not user_id:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
         )
     return user_id
 
 
 async def require_auth(
-    credentials: HTTPAuthorizationCredentials = Security(security)
+    credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> Dict:
     """Require authentication for an endpoint"""
     if not credentials:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed"
         )
     return await get_current_user_claims(credentials)

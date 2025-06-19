@@ -112,9 +112,7 @@ custom:
     useDownloadCache: false
     
     # Don't deploy these AWS SDK packages
-    noDeploy:
-      - boto3
-      - botocore
+    noDeploy: []
   serverless-offline:
     httpPort: 3001
 

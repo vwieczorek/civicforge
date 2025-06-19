@@ -9,29 +9,26 @@ from typing import Optional
 def sanitize_text(text: Optional[str], allow_html: bool = False) -> Optional[str]:
     """
     Sanitize user input to prevent XSS attacks.
-    
+
     Args:
         text: The text to sanitize
         allow_html: Whether to allow basic HTML formatting (default: False)
-        
+
     Returns:
         Sanitized text or None if input was None
     """
     if text is None:
         return None
-    
+
     if not allow_html:
         # Strip all HTML tags for plain text
         return bleach.clean(text, tags=[], strip=True)
     else:
         # Allow only safe tags for formatted text
-        allowed_tags = ['b', 'i', 'u', 'strong', 'em', 'p', 'br']
+        allowed_tags = ["b", "i", "u", "strong", "em", "p", "br"]
         allowed_attributes = {}
         return bleach.clean(
-            text,
-            tags=allowed_tags,
-            attributes=allowed_attributes,
-            strip=True
+            text, tags=allowed_tags, attributes=allowed_attributes, strip=True
         )
 
 

@@ -16,14 +16,11 @@ stage = os.getenv("STAGE", "dev")
 logger = Logger(
     service=service_name,
     level=os.getenv("LOG_LEVEL", "INFO"),
-    log_record_order=["timestamp", "level", "location", "message", "xray_trace_id"]
+    log_record_order=["timestamp", "level", "location", "message", "xray_trace_id"],
 )
 
 # Create metrics instance
-metrics = Metrics(
-    service=service_name,
-    namespace=f"CivicForge/{stage}"
-)
+metrics = Metrics(service=service_name, namespace=f"CivicForge/{stage}")
 
 # Create tracer instance
 tracer = Tracer(service=service_name)
