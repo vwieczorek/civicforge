@@ -4,7 +4,7 @@ frameworkVersion: '3'
 
 provider:
   name: aws
-  runtime: python3.9
+  runtime: python3.11
   stage: ${opt:stage, 'dev'}
   region: ${opt:region, 'us-east-1'}
   
@@ -12,12 +12,10 @@ provider:
     # Cognito JWT Authorizer configuration
     authorizers:
       cognitoJwtAuthorizer:
-        type: jwt
+        identitySource: $request.header.Authorization
         issuerUrl: https://cognito-idp.${self:provider.region}.amazonaws.com/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
         audience:
           - ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
-    # Apply authorizer by default to all endpoints
-    authorizer: cognitoJwtAuthorizer
     # CORS configuration for frontend integration
     cors:
       allowedOrigins:
@@ -31,9 +29,6 @@ provider:
         - PUT
         - DELETE
       allowCredentials: true
-    throttle:
-      rateLimit: 100  # requests per second
-      burstLimit: 200  # burst capacity
   
   # Enable AWS X-Ray tracing for better observability
   tracing:
@@ -42,8 +37,8 @@ provider:
   
   environment:
     COGNITO_REGION: ${self:provider.region}
-    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id~true}
-    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id~true}
+    COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
+    COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
     FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
@@ -97,8 +92,30 @@ custom:
   questsTable: civicforge-${self:provider.stage}-quests
   failedRewardsTable: civicforge-${self:provider.stage}-failed-rewards
   pythonRequirements:
+    # Use Docker for Linux compatibility
     dockerizePip: true
-    slim: true
+    dockerImage: python:3.11-slim
+    
+    # Use deployment requirements file
+    fileName: requirements-deploy.txt
+    
+    # Don't strip binaries
+    strip: false
+    
+    # Include all files
+    slim: false
+    
+    # Package in function (not layer) for debugging
+    layer: false
+    
+    # Use requirements.txt exactly
+    useStaticCache: false
+    useDownloadCache: false
+    
+    # Don't deploy these AWS SDK packages
+    noDeploy:
+      - boto3
+      - botocore
   serverless-offline:
     httpPort: 3001
 
@@ -111,7 +128,6 @@ functions:
       - httpApi:
           path: /health
           method: GET
-          authorizer: none
       - httpApi:
           path: /api/v1/quests
           method: GET
@@ -293,6 +309,11 @@ functions:
           - "dynamodb:GetItem"
         Resource:
           - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:custom.usersTable}"
+      - Effect: "Allow"
+        Action:
+          - "sqs:SendMessage"
+        Resource:
+          - !GetAtt UserCreationDLQ.Arn
     onError: !GetAtt UserCreationDLQ.Arn
   
   # DLQ Re-processor for failed rewards
@@ -793,7 +814,7 @@ resources:
         Namespace: AWS/DynamoDB
         Dimensions:
           - Name: TableName
-            Value: ${self:custom.questsTableName}
+            Value: ${self:custom.questsTable}
         Statistic: Sum
         Period: 300  # 5 minutes
         EvaluationPeriods: 2
@@ -810,7 +831,7 @@ resources:
         Namespace: AWS/DynamoDB
         Dimensions:
           - Name: TableName
-            Value: ${self:custom.usersTableName}
+            Value: ${self:custom.usersTable}
         Statistic: Sum
         Period: 300  # 5 minutes
         EvaluationPeriods: 2
