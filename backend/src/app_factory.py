@@ -14,6 +14,7 @@ from typing import List
 
 from .rate_limiter import limiter, rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from .middleware.security_headers import add_security_headers
 
 # Configure logging
 logger = logging.getLogger()
@@ -41,6 +42,9 @@ def create_app(
     # Add rate limiter to the app state
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+    # Add security headers middleware
+    app.middleware("http")(add_security_headers)
 
     # Configure CORS with specific headers (fixing the wildcard security issue)
     allowed_origins = os.environ.get("FRONTEND_URL", "http://localhost:5173").split(",")

@@ -2,6 +2,23 @@ service: civicforge-api
 
 frameworkVersion: '3'
 
+package:
+  exclude:
+    - .venv/**
+    - .mypy_cache/**
+    - .pytest_cache/**
+    - .coverage
+    - htmlcov/**
+    - tests/**
+    - docs/**
+    - scripts/**
+    - '*.md'
+    - '*.zip'
+    - python3.11
+    - __pycache__/**
+    - .serverless/**
+    - node_modules/**
+
 provider:
   name: aws
   runtime: python3.11
@@ -12,9 +29,11 @@ provider:
     # Cognito JWT Authorizer configuration
     authorizers:
       cognitoJwtAuthorizer:
+        type: jwt
         identitySource: $request.header.Authorization
         issuerUrl: https://cognito-idp.${self:provider.region}.amazonaws.com/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
         audience:
+          - civicforge-api
           - ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
     # CORS configuration for frontend integration
     cors:
@@ -29,6 +48,10 @@ provider:
         - PUT
         - DELETE
       allowCredentials: true
+    # API Gateway throttling configuration
+    throttle:
+      burstLimit: 2000  # Maximum burst requests
+      rateLimit: 1000   # Requests per second
   
   # Enable AWS X-Ray tracing for better observability
   tracing:
@@ -39,6 +62,7 @@ provider:
     COGNITO_REGION: ${self:provider.region}
     COGNITO_USER_POOL_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}
     COGNITO_APP_CLIENT_ID: ${ssm:/civicforge/${self:provider.stage}/cognito-app-client-id}
+    COGNITO_API_AUDIENCE: ${ssm:/civicforge/${self:provider.stage}/cognito-api-audience, 'civicforge-api'}
     USERS_TABLE: ${self:custom.usersTable}
     QUESTS_TABLE: ${self:custom.questsTable}
     FAILED_REWARDS_TABLE: ${self:custom.failedRewardsTable}
@@ -88,30 +112,31 @@ provider:
           Resource: "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:service}-${self:provider.stage}-idempotency"
 
 custom:
+  isProd: ${opt:stage, self:provider.stage} == 'prod'
   usersTable: civicforge-${self:provider.stage}-users
   questsTable: civicforge-${self:provider.stage}-quests
   failedRewardsTable: civicforge-${self:provider.stage}-failed-rewards
   pythonRequirements:
     # Use Docker for Linux compatibility
-    dockerizePip: non-linux
+    dockerizePip: true
     
     # Use deployment requirements file
     fileName: requirements-deploy.txt
     
-    # Don't strip binaries
-    strip: false
+    # Strip binaries to reduce size
+    strip: true
     
-    # Include all files
+    # Optimize package size - disable slim to preserve metadata
     slim: false
     
-    # Package in function (not layer) for debugging
+    # Use layer for dependencies in production
     layer: false
     
-    # Use requirements.txt exactly
-    useStaticCache: false
-    useDownloadCache: false
+    # Enable caching for faster builds
+    useStaticCache: true
+    useDownloadCache: true
     
-    # Don't deploy these AWS SDK packages
+    # Don't deploy AWS SDK packages that are already in Lambda
     noDeploy: []
   serverless-offline:
     httpPort: 3001
@@ -119,7 +144,7 @@ custom:
 functions:
   # Main API handler - handles most operations except critical ones
   api:
-    handler: handlers.api.handler
+    handler: src.handlers.api.handler
     events:
       # Health check (public endpoint - no authentication required)
       - httpApi:
@@ -128,27 +153,35 @@ functions:
       - httpApi:
           path: /api/v1/quests
           method: GET
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/quests/{quest_id}
           method: GET
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/quests/{quest_id}/claim
           method: POST
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/quests/{quest_id}/submit
           method: POST
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/quests/{quest_id}/dispute
           method: POST
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/users/{user_id}
           method: GET
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/users/wallet
           method: PUT
+          authorizer: cognitoJwtAuthorizer
       - httpApi:
           path: /api/v1/feature-flags
           method: GET
+          authorizer: cognitoJwtAuthorizer
     iamRoleStatements:
       # Read permissions
       - Effect: Allow
@@ -195,11 +228,12 @@ functions:
   
   # Critical operation: Create Quest (involves financial transaction)
   createQuest:
-    handler: handlers.create_quest.handler
+    handler: src.handlers.create_quest.handler
     events:
       - httpApi:
           path: /api/v1/quests
           method: POST
+          authorizer: cognitoJwtAuthorizer
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -225,11 +259,12 @@ functions:
   
   # Critical operation: Attest Quest (involves rewards)
   attestQuest:
-    handler: handlers.attest_quest.handler
+    handler: src.handlers.attest_quest.handler
     events:
       - httpApi:
           path: /api/v1/quests/{quest_id}/attest
           method: POST
+          authorizer: cognitoJwtAuthorizer
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -265,11 +300,12 @@ functions:
   
   # Critical operation: Delete Quest (dangerous operation)
   deleteQuest:
-    handler: handlers.delete_quest.handler
+    handler: src.handlers.delete_quest.handler
     events:
       - httpApi:
           path: /api/v1/quests/{quest_id}
           method: DELETE
+          authorizer: cognitoJwtAuthorizer
     iamRoleStatements:
       - Effect: Allow
         Action:
@@ -313,6 +349,76 @@ functions:
           - !GetAtt UserCreationDLQ.Arn
     onError: !GetAtt UserCreationDLQ.Arn
   
+  # Custom Auth Lambda Triggers
+  defineAuthChallenge:
+    handler: src.auth_handlers.define_auth_challenge.handler
+    memorySize: 128
+    timeout: 6
+    environment:
+      LOG_LEVEL: ${env:LOG_LEVEL, 'INFO'}
+
+  createAuthChallenge:
+    handler: src.auth_handlers.create_auth_challenge.handler
+    memorySize: 256
+    timeout: 10
+    environment:
+      PASSCODES_TABLE: ${self:service}-${self:provider.stage}-passcodes
+      FROM_EMAIL: login@civicforge.org
+      LOG_LEVEL: ${env:LOG_LEVEL, 'INFO'}
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:PutItem
+          - dynamodb:DeleteItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:service}-${self:provider.stage}-passcodes"
+      - Effect: Allow
+        Action:
+          - ses:SendEmail
+        Resource: "*"
+        Condition:
+          StringEquals:
+            ses:FromAddress: login@civicforge.org
+      # Rate limiting table permissions
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/civicforge-rate-limits"
+
+  verifyAuthChallenge:
+    handler: src.auth_handlers.verify_auth_challenge.handler
+    memorySize: 128
+    timeout: 6
+    environment:
+      PASSCODES_TABLE: ${self:service}-${self:provider.stage}-passcodes
+      LOG_LEVEL: ${env:LOG_LEVEL, 'INFO'}
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:service}-${self:provider.stage}-passcodes"
+
+  preAuthentication:
+    handler: src.auth_handlers.pre_authentication.handler
+    memorySize: 128
+    timeout: 6
+    environment:
+      RATE_LIMIT_TABLE: ${self:service}-${self:provider.stage}-auth-rate-limit
+      LOG_LEVEL: ${env:LOG_LEVEL, 'INFO'}
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:UpdateItem
+          - dynamodb:PutItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:${aws:accountId}:table/${self:service}-${self:provider.stage}-auth-rate-limit"
+
   # DLQ Re-processor for failed rewards
   reprocessFailedRewards:
     handler: src.triggers.reprocess_failed_rewards.handler
@@ -473,6 +579,63 @@ resources:
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
     
+    # Rate limiting table for authentication attempts
+    RateLimitTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: civicforge-rate-limits
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: key
+            AttributeType: S
+        KeySchema:
+          - AttributeName: key
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: alias/aws/dynamodb
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    
+    # Token blacklist table for session revocation
+    TokenBlacklistTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: civicforge-token-blacklist
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: jti
+            AttributeType: S
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: revoked_at
+            AttributeType: S
+        KeySchema:
+          - AttributeName: jti
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserIdIndex
+            KeySchema:
+              - AttributeName: user_id
+                KeyType: HASH
+              - AttributeName: revoked_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: alias/aws/dynamodb
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    
     # Dead Letter Queue for failed user creation attempts
     UserCreationDLQ:
       Type: AWS::SQS::Queue
@@ -505,6 +668,81 @@ resources:
       Type: AWS::Lambda::Permission
       Properties:
         FunctionName: !GetAtt CreateUserTriggerLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}"
+    
+    # DynamoDB table for storing passcodes
+    PasscodesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-passcodes
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: email
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: alias/aws/dynamodb
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    # DynamoDB table for rate limiting
+    AuthRateLimitTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${self:provider.stage}-auth-rate-limit
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: identifier
+            AttributeType: S
+        KeySchema:
+          - AttributeName: identifier
+            KeyType: HASH
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        SSESpecification:
+          SSEEnabled: true
+          SSEType: KMS
+          KMSMasterKeyId: alias/aws/dynamodb
+
+    # Lambda permissions for Cognito to invoke auth triggers
+    DefineAuthChallengeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt DefineAuthChallengeLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}"
+
+    CreateAuthChallengeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt CreateAuthChallengeLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}"
+
+    VerifyAuthChallengeLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt VerifyAuthChallengeLambdaFunction.Arn
+        Action: lambda:InvokeFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}"
+
+    PreAuthenticationLambdaPermission:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !GetAtt PreAuthenticationLambdaFunction.Arn
         Action: lambda:InvokeFunction
         Principal: cognito-idp.amazonaws.com
         SourceArn: "arn:aws:cognito-idp:${self:provider.region}:${aws:accountId}:userpool/${ssm:/civicforge/${self:provider.stage}/cognito-user-pool-id}"
@@ -807,15 +1045,15 @@ resources:
       Properties:
         AlarmName: ${self:service}-${self:provider.stage}-quests-table-throttle
         AlarmDescription: "Alert when Quests table is being throttled"
-        MetricName: ConsumedReadCapacityUnits
+        MetricName: ThrottledRequests
         Namespace: AWS/DynamoDB
         Dimensions:
           - Name: TableName
             Value: ${self:custom.questsTable}
         Statistic: Sum
         Period: 300  # 5 minutes
-        EvaluationPeriods: 2
-        Threshold: 80  # 80% of provisioned capacity
+        EvaluationPeriods: 1
+        Threshold: 5  # Alert on any throttling
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching
     
@@ -824,15 +1062,85 @@ resources:
       Properties:
         AlarmName: ${self:service}-${self:provider.stage}-users-table-throttle
         AlarmDescription: "Alert when Users table is being throttled"
-        MetricName: ConsumedReadCapacityUnits
+        MetricName: ThrottledRequests
         Namespace: AWS/DynamoDB
         Dimensions:
           - Name: TableName
             Value: ${self:custom.usersTable}
         Statistic: Sum
         Period: 300  # 5 minutes
-        EvaluationPeriods: 2
-        Threshold: 80  # 80% of provisioned capacity
+        EvaluationPeriods: 1
+        Threshold: 5  # Alert on any throttling
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+    
+    # Auth Lambda monitoring alarms
+    PasscodeDeliveryFailureAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-passcode-delivery-failures
+        AlarmDescription: "Alert when passcode email delivery fails"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-createAuthChallenge
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+
+    AuthRateLimitAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-auth-rate-limit-hits
+        AlarmDescription: "Alert when auth rate limits are frequently hit"
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        Dimensions:
+          - Name: FunctionName
+            Value: ${self:service}-${self:provider.stage}-preAuthentication
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 10
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+
+    # DynamoDB throttle alarms for auth tables
+    PasscodesTableThrottleAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-passcodes-table-throttle
+        AlarmDescription: "Alert when Passcodes table is being throttled"
+        MetricName: ThrottledRequests
+        Namespace: AWS/DynamoDB
+        Dimensions:
+          - Name: TableName
+            Value: ${self:service}-${self:provider.stage}-passcodes
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 5
+        ComparisonOperator: GreaterThanThreshold
+        TreatMissingData: notBreaching
+
+    AuthRateLimitTableThrottleAlarm:
+      Type: AWS::CloudWatch::Alarm
+      Properties:
+        AlarmName: ${self:service}-${self:provider.stage}-rate-limit-table-throttle
+        AlarmDescription: "Alert when Auth Rate Limit table is being throttled"
+        MetricName: ThrottledRequests
+        Namespace: AWS/DynamoDB
+        Dimensions:
+          - Name: TableName
+            Value: ${self:service}-${self:provider.stage}-auth-rate-limit
+        Statistic: Sum
+        Period: 300
+        EvaluationPeriods: 1
+        Threshold: 5
         ComparisonOperator: GreaterThanThreshold
         TreatMissingData: notBreaching
     

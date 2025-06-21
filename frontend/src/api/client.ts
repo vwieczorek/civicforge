@@ -12,13 +12,21 @@ class ApiClient {
   private async getAuthHeader(): Promise<Record<string, string>> {
     try {
       const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
+      // Try access token first, fallback to ID token if not available
+      const accessToken = session.tokens?.accessToken?.toString();
+      const idToken = session.tokens?.idToken?.toString();
+      const token = accessToken || idToken;
       
       if (token) {
+        // Only log token type in development
+        if (!accessToken && idToken && process.env.NODE_ENV === 'development') {
+          console.warn('Using ID token as fallback - access token not available');
+        }
         return { Authorization: `Bearer ${token}` };
       }
       return {};
-    } catch {
+    } catch (error) {
+      console.error('Failed to fetch auth session:', error);
       return {};
     }
   }
@@ -26,32 +34,73 @@ class ApiClient {
   private async request<T>(
     method: string,
     path: string,
-    body?: any
+    body?: any,
+    options: { timeout?: number } = {}
   ): Promise<T> {
     const headers = await this.getAuthHeader();
     
-    const response = await fetch(`${API_ENDPOINT}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutMs = options.timeout || 30000; // Default 30 second timeout
+    
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+    
+    try {
+      const response = await fetch(`${API_ENDPOINT}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
 
     if (!response.ok) {
-      let errorMessage = 'API request failed';
-      try {
-        const error = await response.json();
-        errorMessage = error.detail || errorMessage;
-      } catch {
-        // If we can't parse JSON, use status text
-        errorMessage = response.statusText || errorMessage;
+      // Use generic error messages based on status code
+      let errorMessage = 'Request failed. Please try again.';
+      
+      if (response.status === 401) {
+        errorMessage = 'Please sign in to continue.';
+      } else if (response.status === 403) {
+        errorMessage = 'You do not have permission to perform this action.';
+      } else if (response.status === 404) {
+        errorMessage = 'The requested resource was not found.';
+      } else if (response.status >= 500) {
+        errorMessage = 'A server error occurred. Please try again later.';
       }
+      
+      // Only log detailed errors in development
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          const error = await response.json();
+          console.error('API Error:', error);
+        } catch {
+          console.error('API Error:', response.statusText);
+        }
+      }
+      
       throw new Error(errorMessage);
     }
 
     return response.json();
+    } catch (error) {
+      // Clear timeout on error
+      clearTimeout(timeoutId);
+      
+      // Handle timeout specifically
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      }
+      
+      // Re-throw other errors
+      throw error;
+    } finally {
+      // Always clear the timeout
+      clearTimeout(timeoutId);
+    }
   }
 
   // Generic methods for reuse
