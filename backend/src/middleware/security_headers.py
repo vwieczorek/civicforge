@@ -59,7 +59,8 @@ async def add_security_headers(request: Request, call_next: Callable) -> Respons
         )
     
     # Remove server header to avoid version disclosure
-    response.headers.pop("server", None)
+    if "server" in response.headers:
+        del response.headers["server"]
     
     # Add custom security header
     response.headers["X-Powered-By"] = "CivicForge"
