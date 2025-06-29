@@ -75,6 +75,7 @@ Focus areas in priority order:
 - Main docs: `./civic-compass-vision/`
 - Vision: `CIVIC_COMPASS_CIVICFORGE_VISION.md`
 - Technical: `CIVIC_COMPASS_TECHNICAL_SPEC.md`
-- Prototype: `CIVIC_COMPASS_PROTOTYPE.md`
+- Future Design: `FUTURE_PROTOTYPE_DESIGN.md`
+- Working Prototype: `/prototype/`
 
 Remember: This is about amplifying human civic engagement, not replacing it. The technology serves the community, not the other way around.

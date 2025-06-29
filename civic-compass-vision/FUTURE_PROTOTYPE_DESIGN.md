@@ -1,6 +1,8 @@
-# AI-First CivicForge: Working Prototype
+# CivicForge: Future Prototype Design
 
-This document demonstrates a concrete implementation of key components for the AI-first CivicForge.
+> **Note**: This document describes an advanced future prototype with features like homomorphic encryption, DIDs, and P2P networking. For the current working prototype, see [/prototype/README.md](../prototype/README.md).
+
+This document demonstrates the envisioned future implementation of key components for CivicForge, incorporating advanced privacy-preserving technologies and decentralized identity.
 
 ## Example User Journey
 

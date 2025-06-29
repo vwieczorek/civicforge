@@ -66,11 +66,16 @@ The beach cleanup matches your environmental interests. Should I connect you wit
 
 ## Getting Started
 
-Currently in design phase. To contribute:
+### Try the Prototype
+
+We have a working prototype! See [prototype/README.md](./prototype/README.md) to run the basic Local Controller and Remote Thinker demo.
+
+### Learn More
 
 1. Review [Vision Document](./civic-compass-vision/CIVIC_COMPASS_CIVICFORGE_VISION.md)
 2. Explore [Technical Architecture](./civic-compass-vision/CIVIC_COMPASS_TECHNICAL_SPEC.md)  
-3. See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines
+3. Check our [Roadmap](./ROADMAP.md) for development plans
+4. See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines
 
 ## Security & Privacy
 
@@ -82,4 +87,4 @@ Built on privacy-first principles:
 
 ## License
 
-Open source (license pending)
+This project is licensed under the Apache License 2.0 - see the [LICENSE](./LICENSE) file for details.

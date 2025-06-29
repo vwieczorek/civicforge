@@ -9,7 +9,8 @@ This directory contains the architectural vision for CivicForge's transformation
 ### Core Vision & Architecture
 - **[CIVIC_COMPASS_CIVICFORGE_VISION.md](./CIVIC_COMPASS_CIVICFORGE_VISION.md)** - Complete architectural vision focusing on the Hybrid Agent Model
 - **[CIVIC_COMPASS_TECHNICAL_SPEC.md](./CIVIC_COMPASS_TECHNICAL_SPEC.md)** - Technical implementation details for core components
-- **[CIVIC_COMPASS_PROTOTYPE.md](./CIVIC_COMPASS_PROTOTYPE.md)** - MVP roadmap prioritizing essential features
+- **[FUTURE_PROTOTYPE_DESIGN.md](./FUTURE_PROTOTYPE_DESIGN.md)** - Advanced prototype design with future technologies
+- **[Working Prototype](../prototype/)** - Current minimal viable prototype demonstrating core concepts
 
 ### Design Process
 - **[DESIGN_PROCESS.md](./DESIGN_PROCESS.md)** - Evolution from initial concept to human-centric design
@@ -33,7 +34,8 @@ For developers and contributors:
 1. Start with this README
 2. Read CIVIC_COMPASS_CIVICFORGE_VISION.md for conceptual understanding
 3. Review CIVIC_COMPASS_TECHNICAL_SPEC.md for implementation details
-4. Check CIVIC_COMPASS_PROTOTYPE.md for development priorities
+4. Try the [working prototype](../prototype/) for hands-on experience
+5. Review FUTURE_PROTOTYPE_DESIGN.md for advanced feature roadmap
 
 ## Design Principles
 
