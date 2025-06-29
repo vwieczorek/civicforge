@@ -1,0 +1,16 @@
+# Environment variables (contains API keys)
+.env
+
+# Audio output files
+audio_output/
+*.mp3
+*.wav
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS files
+.DS_Store
+Thumbs.db

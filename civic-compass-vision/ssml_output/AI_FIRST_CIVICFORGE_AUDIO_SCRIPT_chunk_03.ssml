@@ -1,0 +1,3 @@
+<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">
+<prosody volume="soft"> That's the future we're building. One attestation at a time. <break strength="medium"/> Thank you for listening. And remember <break strength="medium"/> the future of civic engagement isn't about better forms or smoother workflows. It's about <say-as interpret-as="characters">AI</say-as> that understands us, represents us, and helps us work together to build stronger communities. <prosody pitch="+3%" rate="0.95"> Welcome to <phoneme alphabet="ipa" ph="ˈsɪvɪk fɔrdʒ">CivicForge</phoneme>. <break time="2s"/></prosody></prosody>
+</speak>
