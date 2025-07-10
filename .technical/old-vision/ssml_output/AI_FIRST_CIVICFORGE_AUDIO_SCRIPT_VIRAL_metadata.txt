@@ -1,0 +1,7 @@
+Original file: AI_FIRST_CIVICFORGE_AUDIO_SCRIPT_VIRAL.md
+Total chunks: 2
+Recommended model: eleven_v3
+Character limit used: 9500
+
+Chunk 01: 9426 characters
+Chunk 02: 3468 characters

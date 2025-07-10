@@ -59,23 +59,29 @@ This is THE fundamental architectural decision. All other features build on this
 
 ## Current Status
 
-Vision and architecture phase. Not yet in implementation.
+**Phase 1 Implementation**: Building core NLP for natural language understanding
+- ✅ Intent recognition (OFFER_HELP, REQUEST_HELP, SHARE_AVAILABILITY, SHARE_SKILLS)
+- 🚧 Entity extraction, dialog management, context tracking
+
+## Implementation Approach
+
+We're starting simple to validate the core concept, then building towards the full vision:
+1. **Now**: Basic NLP + simple client-server to prove conversational civic engagement works
+2. **Next**: Add Local Controller for privacy/consent
+3. **Then**: Implement DIDs and federated architecture
+4. **Future**: Full P2P network with Community Hubs
 
 ## For Contributors
 
-Focus areas in priority order:
-1. Hybrid agent architecture design
-2. DID implementation strategy
-3. P2P network protocols
-4. Natural language processing
-5. Privacy-preserving techniques
+**Immediate focus**: Natural language understanding and conversation engine
+**Vision focus**: Keep the Hybrid Agent Model, DIDs, and federation in mind for all design decisions
 
 ## Quick Reference
 
-- Main docs: `./civic-compass-vision/`
-- Vision: `CIVIC_COMPASS_CIVICFORGE_VISION.md`
-- Technical: `CIVIC_COMPASS_TECHNICAL_SPEC.md`
-- Future Design: `FUTURE_PROTOTYPE_DESIGN.md`
-- Working Prototype: `/prototype/`
+- Implementation: `./src/`
+- Documentation: `./docs/`
+- Working demo: `./try-it/`
+- Vision details: `./docs/vision.md`
+- Technical roadmap: `./docs/technical/`
 
 Remember: This is about amplifying human civic engagement, not replacing it. The technology serves the community, not the other way around.
