@@ -1,33 +1,61 @@
-# Try CivicForge Now
+# Experience CivicForge
 
-Experience the future of community connection in 30 seconds.
+Connect with your community in meaningful ways.
 
-## Quick Start (Real Implementation!)
+## Try It Now
 
-From the project root directory:
-
+Just one command:
 ```bash
-./demo.sh
+./launch_demo.sh
 ```
 
-That's it. Start talking to your community with real NLP and matching!
+That's it! Have a natural conversation about how you'd like to help.
 
-## What's New
+## Alternative Options
 
-We've upgraded from the mock demo to the **real Phase 1 implementation**:
-- ✅ Natural language understanding of your civic interests
-- ✅ Entity extraction (skills, times, locations)
-- ✅ Smart matching algorithm (83% accuracy)
-- ✅ Interactive conversation interface
-- ✅ Full API at http://localhost:8000/docs
+**For the full authentication experience:**
+```bash
+./run_authenticated_demo.sh
+```
 
-## Legacy Mock Demo
+**To run components separately:**
+1. Start the API: `./start_demo.sh`
+2. Run the client: `python3 civic_demo.py`
 
-The original mock demo files are preserved here for reference:
-- `demo.sh` - Original launcher (now use `../demo.sh` for real version)
-- `local.js` - Mock privacy guardian 
-- `server.py` - Mock conversation AI
+## What You'll Experience
 
-## Next Steps
+✨ **Natural Conversation** - Just talk about your interests and availability  
+🔍 **Smart Matching** - Discovers opportunities that fit your life  
+🔐 **Privacy First** - Secure connection, minimal data collection  
+🤝 **Real Impact** - Connect with actual community needs
 
-Inspired? [Join us in building the real thing →](../community/contributing.md)
+## Example Conversation
+
+```
+You: I enjoy working with kids and I'm free on weekends
+
+CivicForge: Wonderful! You have experience with kids. 
+            When are you available to help?
+
+You: Saturday mornings work best for me
+
+CivicForge: Thank you! Where would you prefer to volunteer?
+
+You: Somewhere near downtown
+
+CivicForge: Let me confirm what I've understood:
+            - You want to volunteer
+            - Skills/Interests: kids
+            - Available: Saturday morning
+            - Preferred locations: downtown
+            
+            Is this correct?
+```
+
+## How We Protect Your Privacy
+
+CivicForge keeps your information safe while connecting you with opportunities that matter. We only ask for what we need to help you make a difference.
+
+## Join Us
+
+Inspired to make community connection even better? [Contribute →](../docs/community-guide.md)
