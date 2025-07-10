@@ -22,6 +22,9 @@ class IntentRecognizer:
     """Recognizes user intent from natural language input"""
 
     def __init__(self):
+        self.context = {}
+        self.last_intent = None
+        
         # Intent patterns - keywords and phrases that indicate each intent
         self.intent_patterns = {
             "OFFER_HELP": {
@@ -105,11 +108,29 @@ class IntentRecognizer:
         }
 
         self.context = {}
+        
+        # Additional contextual intents
+        self.contextual_patterns = {
+            "CONFIRM_HELP": {
+                "keywords": ["yes", "sure", "okay", "definitely"],
+                "context_required": "OFFER_HELP"
+            },
+            "CONFIRM_INTEREST": {
+                "keywords": ["yes", "interested", "tell me"],
+                "context_required": "REQUEST_HELP"
+            }
+        }
 
     def recognize(self, text: str) -> IntentResult:
         """Recognize intent from input text"""
         # Normalize text
         text_lower = text.lower().strip()
+
+        # First check contextual intents if we have context
+        if self.last_intent and text_lower in ["yes", "no", "maybe", "sure", "okay"]:
+            contextual_result = self._check_contextual_intent(text_lower)
+            if contextual_result:
+                return contextual_result
 
         # Score each intent
         intent_scores = {}
@@ -123,13 +144,19 @@ class IntentRecognizer:
 
         # Handle unclear cases
         if confidence < 0.5:
-            return IntentResult(
+            result = IntentResult(
                 intent="UNCLEAR",
                 confidence=confidence,
                 suggested_clarification="I'm not sure what you mean. Are you looking to help, or do you need assistance?",
             )
-
-        return IntentResult(intent=intent, confidence=confidence)
+        else:
+            result = IntentResult(intent=intent, confidence=confidence)
+            
+        # Update context
+        self.last_intent = result.intent
+        self.context["last_intent"] = result.intent
+        
+        return result
 
     def _calculate_intent_score(self, text: str, patterns: Dict) -> float:
         """Calculate confidence score for a specific intent"""
@@ -161,6 +188,15 @@ class IntentRecognizer:
 
         return min(score, 1.0)
 
+    def _check_contextual_intent(self, text: str) -> Optional[IntentResult]:
+        """Check for contextual intents based on conversation history"""
+        for intent, pattern in self.contextual_patterns.items():
+            if pattern.get("context_required") == self.last_intent:
+                if any(keyword in text for keyword in pattern["keywords"]):
+                    return IntentResult(intent=intent, confidence=0.8)
+        return None
+
     def reset_context(self):
         """Reset conversation context"""
         self.context = {}
+        self.last_intent = None

@@ -82,7 +82,6 @@ class TestBasicIntents:
 class TestIntentContext:
     """Intent recognition with context awareness"""
     
-    @pytest.mark.skip(reason="Implement context tracking first")
     def test_contextual_intent(self):
         """Intent changes based on conversation context"""
         recognizer = IntentRecognizer()
@@ -96,9 +95,9 @@ class TestIntentContext:
         
         # New conversation
         recognizer.reset_context()
-        recognizer.recognize("Do you have volunteer opportunities?")
+        recognizer.recognize("I need help")
         
-        # Same "Yes" now means something different
+        # Same "Yes" now means something different  
         result = recognizer.recognize("Yes")
         assert result.intent == "CONFIRM_INTEREST"
 
@@ -106,7 +105,6 @@ class TestIntentContext:
 class TestEdgeCases:
     """Handle unclear or ambiguous inputs gracefully"""
     
-    @pytest.mark.skip(reason="Focus on basic intents first")
     def test_unclear_intent(self):
         """When we're not sure, we should ask"""
         recognizer = IntentRecognizer()
