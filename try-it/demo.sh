@@ -20,19 +20,22 @@ if ! command -v node &> /dev/null; then
     exit 1
 fi
 
-# Check if FastAPI is installed
-if ! python3 -c "import fastapi" 2>/dev/null; then
-    echo "📦 Installing required Python packages..."
-    pip install -r requirements.txt || {
-        echo "❌ Error: Failed to install Python packages"
-        echo "Try: pip install fastapi uvicorn"
-        exit 1
-    }
+# Set up virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "📦 Creating virtual environment..."
+    python3 -m venv venv
 fi
+
+# Install dependencies
+echo "📦 Installing required Python packages..."
+./venv/bin/pip install -r requirements.txt -q || {
+    echo "❌ Error: Failed to install Python packages"
+    exit 1
+}
 
 # Start Remote Thinker in background
 echo "🚀 Starting Remote Thinker (AI Service)..."
-python3 remote_thinker.py &
+./venv/bin/python server.py &
 REMOTE_PID=$!
 
 # Give Remote Thinker time to start
@@ -63,7 +66,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Start Local Controller in foreground
-node local_controller.js
+node local.js
 
 # This line is reached when Local Controller exits
 cleanup
