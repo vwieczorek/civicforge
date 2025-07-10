@@ -15,6 +15,7 @@ The foundation of CivicForge is a carefully balanced split between local control
 - **Stores your values** - Your "Personal Constitution" guides all AI recommendations  
 - **Final approval authority** - Nothing happens without your explicit consent
 - **Privacy guardian** - Sensitive data never leaves your device
+- **Works offline** - Queues actions when disconnected, syncs when ready
 
 ### Remote Thinker (Cloud/Edge)
 - **Natural language understanding** - Interprets your civic needs from conversation
@@ -29,6 +30,7 @@ This separation ensures you maintain sovereignty while benefiting from powerful 
 Unlike centralized platforms, CivicForge operates through community-owned infrastructure:
 
 - **Community Hubs** - Run by local governments, nonprofits, or trusted organizations
+- **Resilient connectivity** - Works even with intermittent internet through store-and-forward
 - **Peer-to-peer discovery** - Find opportunities without exposing your data
 - **No single point of failure** - Network continues even if individual nodes go down
 - **Local governance** - Communities control their own civic data

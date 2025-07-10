@@ -61,7 +61,12 @@ This is THE fundamental architectural decision. All other features build on this
 
 **Phase 1 Implementation**: Building core NLP for natural language understanding
 - ✅ Intent recognition (OFFER_HELP, REQUEST_HELP, SHARE_AVAILABILITY, SHARE_SKILLS)
-- 🚧 Entity extraction, dialog management, context tracking
+- ✅ Entity extraction (skills, times, locations) 
+- ✅ Dialog management with state machine
+- ✅ Privacy/consent interfaces defined
+- ❌ Matching logic (opportunity_matcher.py, skill_analyzer.py) - **Do this next**
+- ❌ API endpoints for testing
+- ❌ Tests for dialog_manager and interfaces
 
 ## Implementation Approach
 
@@ -73,7 +78,12 @@ We're starting simple to validate the core concept, then building towards the fu
 
 ## For Contributors
 
-**Immediate focus**: Natural language understanding and conversation engine
+**Immediate focus**: Complete matching logic to close the value loop
+**Next priorities**: API endpoints, increase test coverage, add persistence layer
+**Architecture notes**: 
+- Protocol-based interfaces are working well - keep this pattern
+- Privacy budget (100 queries) needs configuration system
+- YAML entity config won't scale - plan for database migration
 **Vision focus**: Keep the Hybrid Agent Model, DIDs, and federation in mind for all design decisions
 
 ## Quick Reference

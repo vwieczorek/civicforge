@@ -10,7 +10,13 @@ The vision is clear: conversational AI for civic engagement. This guide shows ho
 
 - **Vision**: Complete ✓
 - **Prototype**: Demo concept in `try-it/` ✓
-- **Implementation**: Starting fresh in `src/` ←You are here
+- **Implementation**: Core NLP working in `src/` ←You are here
+  - Intent recognition with embeddings ✓
+  - Entity extraction configured ✓
+  - Dialog management state machine ✓
+  - Privacy/consent interfaces defined ✓
+  - Matching logic needed ⏳
+  - API endpoints needed ⏳
 
 ## Implementation Phases
 
@@ -29,7 +35,7 @@ src/
 │   │   ├── dialog_manager.py
 │   │   ├── context_tracker.py
 │   │   └── tests/
-│   └── matching/
+│   └── matching/          # Priority: Complete this next
 │       ├── opportunity_matcher.py
 │       ├── skill_analyzer.py
 │       └── tests/
@@ -58,10 +64,16 @@ src/
 │   ├── shared/
 │   │   ├── components/
 │   │   ├── stores/
+│   │   ├── offline/     # Offline-first sync
 │   │   └── tests/
 ```
 
 **First PR Goal**: Display conversation and approval UI
+
+**Key Features**:
+- Approval dialogs for all data sharing
+- Offline queue for actions when disconnected
+- Optional emergency disconnect for user safety
 
 **Tests First**:
 ```typescript
@@ -69,6 +81,13 @@ test('approval flow shows clear action', () => {
   const action: ApprovalAction = {type: 'CONNECT', with: 'Community Garden'};
   const component = render(<ApprovalDialog action={action} />);
   expect(component.getByText('Connect with Community Garden?')).toBeVisible();
+});
+
+test('queues actions when offline', () => {
+  const controller = new LocalController();
+  controller.setOffline(true);
+  controller.requestApproval(mockAction);
+  expect(controller.offlineQueue).toHaveLength(1);
 });
 ```
 
@@ -128,6 +147,45 @@ def test_no_sharing_without_consent():
     assert shared == {}
 ```
 
+### Phase 5: Community Hub Resilience (Weeks 17-20)
+
+**Goal**: Ensure civic engagement works even with limited connectivity
+
+```
+src/
+├── hubs/
+│   ├── sync/
+│   │   ├── store_forward.py
+│   │   ├── conflict_resolution.py
+│   │   └── tests/
+│   ├── federation/
+│   │   ├── hub_protocol.py
+│   │   ├── hub_discovery.py
+│   │   └── tests/
+```
+
+**Key Features**:
+- Store-and-forward for offline users
+- Sync protocols between Local Controller and Hubs
+- Conflict resolution for concurrent edits
+- Optional local mesh for civic events
+
+**First PR Goal**: Hub stores messages for offline users
+
+**Tests First**:
+```python
+def test_hub_stores_for_offline_user():
+    """Hub queues messages when user offline"""
+    hub = CommunityHub()
+    user_id = "did:web:example.com:user:123"
+    
+    hub.mark_user_offline(user_id)
+    hub.queue_message(user_id, "New volunteer opportunity!")
+    
+    messages = hub.get_queued_messages(user_id)
+    assert len(messages) == 1
+```
+
 ## Development Principles
 
 ### 1. Test-Driven Development
@@ -135,6 +193,7 @@ def test_no_sharing_without_consent():
 - Make it pass
 - Refactor
 - Every PR must increase test coverage
+- Note: Dialog manager and interfaces need test coverage
 
 ### 2. User-Facing Features First
 - Can a user see/experience this change?
