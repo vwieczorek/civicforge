@@ -1,57 +1,15 @@
-# CivicForge: Your Civic Compass
+# CivicForge
 
-> Human-amplified civic engagement through conversational AI
+*Strengthening communities through simple conversations.*
 
-## Overview
+## Supporting Community Connections
 
-CivicForge transforms civic participation through natural conversation. Instead of navigating complex websites, citizens simply talk with their Civic Compass - an AI assistant that helps discover opportunities, coordinate with neighbors, and amplify community impact while keeping humans in control.
-
-## Core Architecture: The Hybrid Agent Model
-
-The foundation of CivicForge is a carefully balanced split between local control and intelligent assistance:
-
-### Local Controller (Your Device)
-- **Holds your identity keys** - Only you control your civic identity (W3C DIDs)
-- **Stores your values** - Your "Personal Constitution" guides all AI recommendations  
-- **Final approval authority** - Nothing happens without your explicit consent
-- **Privacy guardian** - Sensitive data never leaves your device
-- **Works offline** - Queues actions when disconnected, syncs when ready
-
-### Remote Thinker (Cloud/Edge)
-- **Natural language understanding** - Interprets your civic needs from conversation
-- **Opportunity discovery** - Finds relevant ways to help based on your interests
-- **Coordination assistance** - Negotiates with other agents to reduce friction
-- **Context-aware guidance** - Learns your patterns while respecting privacy boundaries
-
-This separation ensures you maintain sovereignty while benefiting from powerful AI capabilities.
-
-## Federated P2P Network
-
-Unlike centralized platforms, CivicForge operates through community-owned infrastructure:
-
-- **Community Hubs** - Run by local governments, nonprofits, or trusted organizations
-- **Resilient connectivity** - Works even with intermittent internet through store-and-forward
-- **Peer-to-peer discovery** - Find opportunities without exposing your data
-- **No single point of failure** - Network continues even if individual nodes go down
-- **Local governance** - Communities control their own civic data
-
-## Trust Through Decentralized Identity
-
-Every participant has a verifiable identity without centralized control:
-
-- **W3C DIDs** - Self-sovereign identity you own
-- **Verifiable Credentials** - Prove civic contributions cryptographically
-- **Composite Reputation** - Combines human actions with AI behavior
-- **Privacy-preserving** - Share only what's needed, when needed
-
-## Natural Language Interface
-
-Civic engagement becomes as simple as having a conversation:
+Every community has people who want to help and organizations that need support. CivicForge brings them together through the power of conversation—making civic engagement as natural as talking with a neighbor.
 
 ```
 You: "I have two hours free this weekend and want to help"
 
-Civic Compass: "I found three opportunities nearby:
+CivicForge: "I found three opportunities nearby:
 - Beach cleanup Saturday morning (1.5 hours)
 - Food bank needs drivers (2 hour shifts)
 - Library seeks reading volunteers (flexible)
@@ -59,44 +17,140 @@ Civic Compass: "I found three opportunities nearby:
 The beach cleanup matches your environmental interests. Should I connect you with the organizer?"
 ```
 
-## Key Innovations
+## Why CivicForge?
 
-- **Serendipity Slider** - Discover unexpected ways to contribute
-- **Non-fungible Reputation** - Context-specific trust that can't be gamed
-- **Privacy Budget** - Limits queries to prevent profiling
-- **Emotion Preservation** - AI never mediates human emotional support
+Finding ways to help in your community shouldn't be complicated. CivicForge makes it simple:
 
-## Getting Started
+- **Talk, don't type** - No forms or complex navigation. Share what you care about through natural conversation.
+- **Community-owned** - Run by local organizations, not corporations. Your community keeps control.
+- **Privacy-focused** - Your data stays on your device. You choose what to share and when.
+- **Actually accessible** - Works for everyone, regardless of tech skills or comfort level.
 
-### Try It Now - 30 Seconds to Your First Match!
+## 🚀 Try the Demo
 
 ```bash
 ./demo.sh
 ```
 
-We have a working Phase 1 implementation with real NLP and matching! The demo will:
-1. Start the CivicForge API server
-2. Launch an interactive conversation interface
-3. Help you discover volunteer opportunities or offer your skills
-4. Show real-time matching with 83% accuracy
+**See CivicForge in action** - Experience how natural conversation can connect you with your community in just 30 seconds.
 
-No configuration needed - just run and start talking!
+## How CivicForge Works
 
-### Learn More
+### 💬 Conversational Interface
+Share your interests and availability through simple dialogue. Our system attempts to understand everyday language, though it's still learning and improving.
 
-1. Review [Vision Document](./civic-compass-vision/CIVIC_COMPASS_CIVICFORGE_VISION.md)
-2. Explore [Technical Architecture](./civic-compass-vision/CIVIC_COMPASS_TECHNICAL_SPEC.md)  
-3. Check our [Roadmap](./ROADMAP.md) for development plans
-4. See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines
+### 🤝 People First  
+CivicForge is designed as a tool to help you find local opportunities. You remain in control of what you share and how you participate.
 
-## Security & Privacy
+### 🔒 Privacy Considerations
+We aim to keep your information secure by storing sensitive data locally when possible. You choose what to share and when.
 
-Built on privacy-first principles:
-- Local processing when possible
-- Cryptographic guarantees
-- User-controlled data
-- See [SECURITY.md](./SECURITY.md) for details
+### 🌐 Community Focus
+CivicForge is designed to be run by communities, for communities. No single entity controls the network.
+
+
+## Example Connections
+
+Here are some ways community members might use CivicForge:
+
+- A resident interested in environmental work finds a local park cleanup
+- Someone who repairs bikes connects with a community repair café  
+- A programmer discovers a nonprofit needing database help
+- An event organizer learns about festivals seeking coordinators
+- A teacher finds tutoring opportunities at the library
+- A neighbor with a truck helps seniors move furniture
+- A gardening enthusiast discovers available community garden plots
+- An accountant volunteers tax help for small nonprofits
+
+These are just examples—your community's needs and opportunities will be unique.
+
+## Features
+
+- **Interest Matching** - Suggests opportunities based on what you share
+- **Flexible Commitment** - Choose one-time or ongoing involvement  
+- **Discovery Mode** - Find new ways to contribute you hadn't considered
+- **Reputation System** - Build trust through community participation
+- **Simple Design** - Focused on being easy to use
+
+## Get Involved
+
+### 👤 For Community Members
+Want to find ways to help in your area?
+
+**→ [Try the Demo](#-try-the-demo)** - Experience CivicForge in 30 seconds
+
+### 🛠️ For Developers
+Ready to improve how communities connect?
+
+- [Technical Overview](./docs/technical/IMPLEMENTATION.md) - Understand the architecture
+- [Contributing Guide](./CONTRIBUTING.md) - Start contributing today
+- [Development Setup](./docs/getting-started.md) - Get your environment ready
+
+### 🏛️ For Community Leaders  
+Want to empower your community with better tools?
+
+**Benefits for your organization:**
+- **Reduce volunteer coordinator workload** - Automated matching saves hours of manual coordination
+- **Increase volunteer retention** - People find opportunities that truly match their interests
+- **Build community resilience** - Create a network ready to respond when needs arise
+- **Own your data** - No dependency on corporate platforms or their changing policies
+
+Get started:
+- [Community Guide](./docs/community-guide.md) - Implementation best practices
+- [Pilot Program](./docs/pilot-guide.md) - Join our early adopter program
+
+## Technical Approach
+
+CivicForge uses several technologies working together:
+
+- **Natural language processing** to understand conversations
+- **Local data storage** to help protect privacy
+- **Decentralized identity** standards (W3C DIDs)
+- **Federated architecture** allowing community control
+
+*For more details: [Architecture Documentation](./docs/technical/)*
+
+## Contributing
+
+CivicForge is open source and welcomes community involvement.
+
+### Ways to Help
+- **Code** - Fix bugs or add features
+- **Design** - Improve the interface
+- **Documentation** - Clarify instructions
+- **Testing** - Try it in your community
+- **Feedback** - Share what works and what doesn't
+
+### Get in Touch
+- [GitHub Issues](https://github.com/yourusername/civicforge/issues) - Report problems or suggest improvements
+- [Discussions](https://github.com/yourusername/civicforge/discussions) - Ask questions or share ideas
+
+## Project Status
+
+We have a working prototype that demonstrates the core concept. The natural language processing achieves about 83% accuracy in our tests, and we're continuing to improve it.
+
+**Phase 1** ✅ Basic conversation and matching engine  
+**Phase 2** 🚧 Privacy improvements and data storage  
+**Phase 3** 📋 Decentralized identity implementation  
+
+See our [Roadmap](./ROADMAP.md) for more details.
+
+## Our Approach
+
+We believe technology should support, not replace, human connections. CivicForge is one tool among many for strengthening communities.
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](./LICENSE) file for details.
+Open source under [Apache License 2.0](./LICENSE).
+
+---
+
+<div align="center">
+
+### Ready to strengthen your community?
+
+## **[▶️ Try CivicForge Now](#-try-the-demo)**
+
+*Just run `./demo.sh` to get started*
+
+</div>
