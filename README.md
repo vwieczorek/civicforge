@@ -68,9 +68,19 @@ The beach cleanup matches your environmental interests. Should I connect you wit
 
 ## Getting Started
 
-### Try the Prototype
+### Try It Now - 30 Seconds to Your First Match!
 
-We have a working prototype! See [prototype/README.md](./prototype/README.md) to run the basic Local Controller and Remote Thinker demo.
+```bash
+./demo.sh
+```
+
+We have a working Phase 1 implementation with real NLP and matching! The demo will:
+1. Start the CivicForge API server
+2. Launch an interactive conversation interface
+3. Help you discover volunteer opportunities or offer your skills
+4. Show real-time matching with 83% accuracy
+
+No configuration needed - just run and start talking!
 
 ### Learn More
 

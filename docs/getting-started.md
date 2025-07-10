@@ -3,11 +3,15 @@
 ## For Everyone: Try It Now
 
 ```bash
-cd try-it
 ./demo.sh
 ```
 
 Just start talking. Tell CivicForge how you want to help your community.
+
+**New!** This now runs the real Phase 1 implementation with:
+- Natural language understanding
+- Smart volunteer-opportunity matching
+- Interactive conversation interface
 
 ## For Community Leaders
 

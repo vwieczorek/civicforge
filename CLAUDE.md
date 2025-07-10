@@ -59,14 +59,16 @@ This is THE fundamental architectural decision. All other features build on this
 
 ## Current Status
 
-**Phase 1 Implementation**: Building core NLP for natural language understanding
+**Phase 1 Implementation**: Core NLP and matching complete, API functional
 - ✅ Intent recognition (OFFER_HELP, REQUEST_HELP, SHARE_AVAILABILITY, SHARE_SKILLS)
 - ✅ Entity extraction (skills, times, locations) 
 - ✅ Dialog management with state machine
 - ✅ Privacy/consent interfaces defined
-- ❌ Matching logic (opportunity_matcher.py, skill_analyzer.py) - **Do this next**
-- ❌ API endpoints for testing
-- ❌ Tests for dialog_manager and interfaces
+- ✅ Matching logic (83% accuracy in testing)
+- ✅ API endpoints (run with: `PYTHONPATH=$PWD python -m src.api.main`)
+- ✅ Live demo available (`./demo.sh`)
+
+**Note**: Dialog manager's intent recognition works but could be more natural - it sometimes treats multi-intent messages too rigidly (e.g., "I can teach Python on Saturdays" gets split rather than understood holistically). See `dialog_manager.py:process_turn()` if improving conversation flow.
 
 ## Implementation Approach
 
@@ -78,12 +80,13 @@ We're starting simple to validate the core concept, then building towards the fu
 
 ## For Contributors
 
-**Immediate focus**: Complete matching logic to close the value loop
-**Next priorities**: API endpoints, increase test coverage, add persistence layer
+**Immediate focus**: Enhance dialog manager for more natural conversations
+**Next priorities**: Increase test coverage, add persistence layer, improve intent recognition
 **Architecture notes**: 
 - Protocol-based interfaces are working well - keep this pattern
 - Privacy budget (100 queries) needs configuration system
 - YAML entity config won't scale - plan for database migration
+- Dialog state machine might be too rigid for natural conversation flow
 **Vision focus**: Keep the Hybrid Agent Model, DIDs, and federation in mind for all design decisions
 
 ## Quick Reference

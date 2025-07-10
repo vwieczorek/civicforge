@@ -7,7 +7,7 @@ and relationship mapping.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional, Tuple, Any
 from enum import Enum
 import re
 
