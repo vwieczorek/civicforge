@@ -10,6 +10,8 @@ from typing import Optional, List, Dict
 
 from .intent_recognition import IntentRecognizer, IntentResult
 from .entity_extraction import EntityExtractor, ExtractedEntities
+from ..interfaces import PrivacyManager, ConsentManager, MockPrivacyManager, MockConsentManager
+from ..interfaces import ConsentType
 
 
 @dataclass
@@ -62,17 +64,44 @@ class NLPResult:
 class NLPProcessor:
     """Main NLP processing pipeline"""
     
-    def __init__(self):
+    def __init__(self, 
+                 privacy_manager: PrivacyManager = None,
+                 consent_manager: ConsentManager = None):
         self.intent_recognizer = IntentRecognizer()
         self.entity_extractor = EntityExtractor()
+        self.privacy_manager = privacy_manager or MockPrivacyManager()
+        self.consent_manager = consent_manager or MockConsentManager()
         
-    def process(self, text: str) -> NLPResult:
+    def process(self, text: str, user_id: str = "anonymous") -> NLPResult:
         """Process text through the full NLP pipeline"""
+        # Check privacy budget
+        budget = self.privacy_manager.check_privacy_budget(user_id)
+        if not budget.has_budget():
+            # Return limited result if budget exhausted
+            return NLPResult(
+                intent=IntentResult("PRIVACY_LIMIT", 1.0, 
+                                  "You've reached your privacy limit for today. Please try again tomorrow."),
+                entities=ExtractedEntities(),
+                raw_text=text
+            )
+        
+        # Use privacy budget
+        budget.use_budget(1)
+        
         # Recognize intent
         intent_result = self.intent_recognizer.recognize(text)
         
         # Extract entities
         entities = self.entity_extractor.extract(text)
+        
+        # Check consent for entity extraction
+        if entities.skills and not self.consent_manager.check_consent(
+            ConsentType.SHARE_SKILLS, "skill_matching"):
+            entities.skills = []  # Clear if no consent
+            
+        if entities.locations and not self.consent_manager.check_consent(
+            ConsentType.SHARE_LOCATION, "location_matching"):
+            entities.locations = []  # Clear if no consent
         
         # Combine results
         return NLPResult(

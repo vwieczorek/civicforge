@@ -14,6 +14,9 @@ from typing import List, Dict, Set, Optional
 import re
 from datetime import datetime
 
+# Import config loader for externalized patterns
+from ..config.config_loader import get_config_loader
+
 
 @dataclass
 class ExtractedEntities:
@@ -28,62 +31,12 @@ class ExtractedEntities:
 class EntityExtractor:
     """Extracts entities from natural language text"""
     
-    def __init__(self):
-        # Common skills and their variations
-        self.skill_patterns = {
-            # Teaching & Education
-            "teaching": ["teach", "teaching", "tutor", "tutoring", "educate", "educating", "instruction"],
-            "math": ["math", "mathematics", "algebra", "calculus", "geometry"],
-            "reading": ["reading", "literacy", "read"],
-            "language": ["english", "spanish", "french", "esl", "language"],
-            
-            # Community Services
-            "gardening": ["garden", "gardening", "plant", "planting", "landscaping"],
-            "cooking": ["cook", "cooking", "bake", "baking", "kitchen", "meal"],
-            "driving": ["drive", "driving", "transport", "transportation"],
-            "cleaning": ["clean", "cleaning", "organize", "organizing"],
-            
-            # Technical Skills
-            "coding": ["code", "coding", "programming", "software", "web development"],
-            "computer": ["computer", "tech support", "it support", "technical"],
-            "design": ["design", "graphic design", "art", "creative"],
-            
-            # Social Support
-            "mentoring": ["mentor", "mentoring", "guide", "counseling"],
-            "childcare": ["childcare", "babysit", "kids", "children"],
-            "eldercare": ["elder", "senior", "elderly care"],
-        }
+    def __init__(self, config_loader=None):
+        # Use provided config loader or get the singleton
+        self.config_loader = config_loader or get_config_loader()
         
-        # Time patterns
-        self.days_of_week = {
-            "monday": ["monday", "mondays", "mon"],
-            "tuesday": ["tuesday", "tuesdays", "tue", "tues"],
-            "wednesday": ["wednesday", "wednesdays", "wed"],
-            "thursday": ["thursday", "thursdays", "thu", "thurs"],
-            "friday": ["friday", "fridays", "fri"],
-            "saturday": ["saturday", "saturdays", "sat"],
-            "sunday": ["sunday", "sundays", "sun"],
-        }
-        
-        self.time_periods = {
-            "morning": ["morning", "mornings", "am", "a.m."],
-            "afternoon": ["afternoon", "afternoons", "pm", "p.m."],
-            "evening": ["evening", "evenings", "night", "nights"],
-            "weekend": ["weekend", "weekends"],
-            "weekday": ["weekday", "weekdays"],
-        }
-        
-        # Location patterns
-        self.location_types = {
-            "community_center": ["community center", "rec center", "recreation center"],
-            "library": ["library", "libraries"],
-            "school": ["school", "elementary", "middle school", "high school"],
-            "park": ["park", "parks", "playground"],
-            "church": ["church", "churches", "parish", "congregation"],
-            "food_bank": ["food bank", "food pantry", "pantry"],
-            "downtown": ["downtown", "city center", "main street"],
-            "neighborhood": ["neighborhood", "nearby", "my area"],
-        }
+        # Load patterns from configuration
+        self._load_patterns()
         
     def extract(self, text: str) -> ExtractedEntities:
         """Extract all entities from input text"""
@@ -121,18 +74,9 @@ class EntityExtractor:
             profession_match = re.search(pattern, text)
             if profession_match:
                 profession = profession_match.group(1).lower()
-                # Map common professions to skills
-                profession_mapping = {
-                    "teacher": "teaching",
-                    "programmer": "coding",
-                    "developer": "coding",
-                    "gardener": "gardening",
-                    "cook": "cooking",
-                    "chef": "cooking",
-                    "driver": "driving",
-                }
-                if profession in profession_mapping:
-                    found_skills.add(profession_mapping[profession])
+                # Use profession mapping from config
+                if profession in self.profession_mapping:
+                    found_skills.add(self.profession_mapping[profession])
                 
         return sorted(list(found_skills))
         
@@ -222,3 +166,24 @@ class EntityExtractor:
                     found_locations.add(location_type)
                     
         return sorted(list(found_locations))
+    
+    def _load_patterns(self):
+        """Load patterns from configuration"""
+        # Load skill patterns
+        self.skill_patterns = self.config_loader.get_skill_patterns()
+        
+        # Load time patterns
+        time_patterns = self.config_loader.get_time_patterns()
+        self.days_of_week = time_patterns["days_of_week"]
+        self.time_periods = time_patterns["time_periods"]
+        
+        # Load location patterns
+        self.location_types = self.config_loader.get_location_patterns()
+        
+        # Load profession mapping
+        self.profession_mapping = self.config_loader.get_profession_mapping()
+    
+    def reload_patterns(self):
+        """Reload patterns from configuration (useful for runtime updates)"""
+        self.config_loader.reload_entities()
+        self._load_patterns()

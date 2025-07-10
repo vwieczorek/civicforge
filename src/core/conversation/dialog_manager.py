@@ -30,55 +30,48 @@ class DialogTurn:
     state: ConversationState = ConversationState.GREETING
 
 
-@dataclass
-class ConversationContext:
-    """Maintains conversation state and history"""
-    current_state: ConversationState = ConversationState.GREETING
-    turns: List[DialogTurn] = None
-    gathered_info: Dict = None
-    
-    def __post_init__(self):
-        if self.turns is None:
-            self.turns = []
-        if self.gathered_info is None:
-            self.gathered_info = {
-                "intent": None,
-                "skills": [],
-                "times": [],
-                "locations": [],
-                "confirmed": False
-            }
-    
-    def add_turn(self, turn: DialogTurn):
-        """Add a turn to the conversation history"""
-        self.turns.append(turn)
-        self.current_state = turn.state
-    
-    def update_gathered_info(self, nlp_result: NLPResult):
-        """Update gathered information from NLP results"""
-        if nlp_result.intent.intent != "UNCLEAR":
-            self.gathered_info["intent"] = nlp_result.intent.intent
-        
-        # Accumulate entities
-        for skill in nlp_result.entities.skills:
-            if skill not in self.gathered_info["skills"]:
-                self.gathered_info["skills"].append(skill)
-        
-        for time in nlp_result.entities.times:
-            if time not in self.gathered_info["times"]:
-                self.gathered_info["times"].append(time)
-                
-        for location in nlp_result.entities.locations:
-            if location not in self.gathered_info["locations"]:
-                self.gathered_info["locations"].append(location)
+# Import the unified ConversationContext from context_tracker
+from .context_tracker import ContextTracker, ConversationTurn as CTTurn
+
+# Import interfaces for future features
+from ..interfaces import (
+    LocalController, MockLocalController,
+    ApprovalRequest, ActionType,
+    PrivacyManager, MockPrivacyManager
+)
 
 
 class DialogManager:
     """Manages conversation flow and response generation"""
     
-    def __init__(self):
-        self.nlp_processor = NLPProcessor()
-        self.context = ConversationContext()
+    def __init__(self, 
+                 context_tracker: ContextTracker = None,
+                 local_controller: LocalController = None,
+                 privacy_manager: PrivacyManager = None):
+        self.context_tracker = context_tracker or ContextTracker()
+        self.local_controller = local_controller or MockLocalController()
+        self.privacy_manager = privacy_manager or MockPrivacyManager()
+        
+        # Initialize NLP processor with privacy/consent managers
+        self.nlp_processor = NLPProcessor(privacy_manager=self.privacy_manager)
+        
+        self.current_state = ConversationState.GREETING
+        self.gathered_info = {
+            "intent": None,
+            "skills": [],
+            "times": [],
+            "locations": [],
+            "confirmed": False
+        }
+        
+        # State handler mapping
+        self.state_handlers = {
+            ConversationState.GREETING: self._handle_initial_intent,
+            ConversationState.GATHERING_INFO: self._handle_info_gathering,
+            ConversationState.CONFIRMING: self._handle_confirmation,
+            ConversationState.MATCHING: self._handle_matching,
+            ConversationState.COMPLETE: self._handle_complete
+        }
         
     def process_turn(self, user_input: str) -> str:
         """Process a user turn and generate response"""
@@ -86,7 +79,7 @@ class DialogManager:
         nlp_result = self.nlp_processor.process(user_input)
         
         # Update context with gathered information
-        self.context.update_gathered_info(nlp_result)
+        self._update_gathered_info(nlp_result)
         
         # Determine next state and response
         next_state, response = self._determine_response(nlp_result)
@@ -98,46 +91,34 @@ class DialogManager:
             nlp_result=nlp_result,
             state=next_state
         )
-        self.context.add_turn(turn)
+        self.current_state = next_state
+        
+        # Also update context tracker
+        self.context_tracker.add_turn(user_input, nlp_result, response)
         
         return response
     
     def _determine_response(self, nlp_result: NLPResult) -> Tuple[ConversationState, str]:
         """Determine the appropriate response based on current state and NLP results"""
         
-        # Check state-specific handlers first
-        # Confirming state needs priority to handle "yes/no" responses
-        if self.context.current_state == ConversationState.CONFIRMING:
-            return self._handle_confirmation(nlp_result)
+        # Special handling for unclear intent
+        if nlp_result.needs_clarification() and self.current_state != ConversationState.CONFIRMING:
+            # Check if we still got useful entities
+            if (self.current_state == ConversationState.GATHERING_INFO and 
+                (nlp_result.entities.skills or nlp_result.entities.times or nlp_result.entities.locations)):
+                # Continue with current handler since we have useful data
+                pass
+            else:
+                # Return clarification request
+                return (
+                    ConversationState.GATHERING_INFO,
+                    nlp_result.intent.suggested_clarification or 
+                    "I'm not sure I understood. Are you looking to volunteer or do you need help?"
+                )
         
-        # If we're already gathering info and get entities, that's still useful
-        if (self.context.current_state == ConversationState.GATHERING_INFO and 
-            nlp_result.needs_clarification() and
-            (nlp_result.entities.skills or nlp_result.entities.times or nlp_result.entities.locations)):
-            # We got useful entities even if intent is unclear
-            return self._handle_info_gathering(nlp_result)
-        
-        # Handle unclear intent
-        if nlp_result.needs_clarification():
-            return (
-                ConversationState.GATHERING_INFO,
-                nlp_result.intent.suggested_clarification or 
-                "I'm not sure I understood. Are you looking to volunteer or do you need help?"
-            )
-        
-        # Initial greeting/intent establishment
-        if self.context.current_state == ConversationState.GREETING:
-            return self._handle_initial_intent(nlp_result)
-        
-        # Gathering additional information
-        elif self.context.current_state == ConversationState.GATHERING_INFO:
-            return self._handle_info_gathering(nlp_result)
-        
-        # Default response
-        return (
-            ConversationState.GATHERING_INFO,
-            "Thank you for that information. Can you tell me more?"
-        )
+        # Use state handler pattern
+        handler = self.state_handlers.get(self.current_state, self._handle_default)
+        return handler(nlp_result)
     
     def _handle_initial_intent(self, nlp_result: NLPResult) -> Tuple[ConversationState, str]:
         """Handle the initial intent from the user"""
@@ -192,7 +173,7 @@ class DialogManager:
     def _handle_confirmation(self, nlp_result: NLPResult) -> Tuple[ConversationState, str]:
         """Handle user confirmation of gathered information"""
         # Only handle confirmation if we're actually in confirming state
-        if self.context.current_state != ConversationState.CONFIRMING:
+        if self.current_state != ConversationState.CONFIRMING:
             # Not in confirmation state, treat as regular input
             return self._handle_info_gathering(nlp_result)
         
@@ -205,11 +186,32 @@ class DialogManager:
                 "I apologize for the confusion. Let's start over. What would you like to correct?"
             )
         elif any(word in user_input_lower for word in ["yes", "correct", "right", "sure"]):
-            self.context.gathered_info["confirmed"] = True
-            return (
-                ConversationState.COMPLETE,
-                "Perfect! I'll help you find matching opportunities. Let me search for activities that match your preferences..."
+            self.gathered_info["confirmed"] = True
+            
+            # Request approval to share data for matching
+            approval_request = ApprovalRequest(
+                action_type=ActionType.SHARE_PROFILE,
+                description="Share your interests and availability to find matching opportunities",
+                data_to_share={
+                    "skills": self.gathered_info["skills"],
+                    "times": self.gathered_info["times"],
+                    "locations": self.gathered_info["locations"]
+                },
+                purpose="opportunity_matching"
             )
+            
+            approval = self.local_controller.request_approval(approval_request)
+            
+            if approval.approved:
+                return (
+                    ConversationState.COMPLETE,
+                    "Perfect! I'll help you find matching opportunities. Let me search for activities that match your preferences..."
+                )
+            else:
+                return (
+                    ConversationState.GATHERING_INFO,
+                    "I understand you'd prefer not to share that information. Is there anything else I can help you with?"
+                )
         else:
             return (
                 ConversationState.CONFIRMING,
@@ -218,7 +220,7 @@ class DialogManager:
     
     def _get_missing_info(self) -> str:
         """Determine what information is still needed"""
-        info = self.context.gathered_info
+        info = self.gathered_info
         missing_prompts = []
         
         # Check what's missing based on intent
@@ -242,7 +244,7 @@ class DialogManager:
     
     def _create_confirmation(self) -> Tuple[ConversationState, str]:
         """Create a confirmation message with all gathered information"""
-        info = self.context.gathered_info
+        info = self.gathered_info
         
         parts = ["Let me confirm what I've understood:"]
         
@@ -275,14 +277,63 @@ class DialogManager:
     
     def reset_conversation(self):
         """Reset the conversation to start fresh"""
-        self.context = ConversationContext()
+        self.context_tracker.reset()
         self.nlp_processor.reset_context()
+        self.current_state = ConversationState.GREETING
+        self.gathered_info = {
+            "intent": None,
+            "skills": [],
+            "times": [],
+            "locations": [],
+            "confirmed": False
+        }
     
     def get_conversation_summary(self) -> Dict:
         """Get a summary of the conversation so far"""
+        tracker_summary = self.context_tracker.get_context_summary()
         return {
-            "state": self.context.current_state.value,
-            "turns": len(self.context.turns),
-            "gathered_info": self.context.gathered_info,
-            "confirmed": self.context.gathered_info.get("confirmed", False)
+            "state": self.current_state.value,
+            "turns": tracker_summary["num_turns"],
+            "gathered_info": self.gathered_info,
+            "confirmed": self.gathered_info.get("confirmed", False),
+            "tracker_summary": tracker_summary
         }
+    
+    def _update_gathered_info(self, nlp_result: NLPResult):
+        """Update gathered information from NLP results"""
+        if nlp_result.intent.intent != "UNCLEAR":
+            self.gathered_info["intent"] = nlp_result.intent.intent
+        
+        # Accumulate entities
+        for skill in nlp_result.entities.skills:
+            if skill not in self.gathered_info["skills"]:
+                self.gathered_info["skills"].append(skill)
+        
+        for time in nlp_result.entities.times:
+            if time not in self.gathered_info["times"]:
+                self.gathered_info["times"].append(time)
+                
+        for location in nlp_result.entities.locations:
+            if location not in self.gathered_info["locations"]:
+                self.gathered_info["locations"].append(location)
+    
+    def _handle_default(self, nlp_result: NLPResult) -> Tuple[ConversationState, str]:
+        """Default handler for unexpected states"""
+        return (
+            ConversationState.GATHERING_INFO,
+            "Thank you for that information. Can you tell me more?"
+        )
+    
+    def _handle_matching(self, nlp_result: NLPResult) -> Tuple[ConversationState, str]:
+        """Handle matching state (currently just transitions to complete)"""
+        return (
+            ConversationState.COMPLETE,
+            "I'm searching for opportunities that match your preferences..."
+        )
+    
+    def _handle_complete(self, nlp_result: NLPResult) -> Tuple[ConversationState, str]:
+        """Handle complete state"""
+        return (
+            ConversationState.COMPLETE,
+            "Your request has been processed. Is there anything else I can help you with?"
+        )

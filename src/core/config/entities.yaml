@@ -1,0 +1,211 @@
+# Entity configuration for CivicForge
+# This file defines patterns for entity extraction
+
+skills:
+  teaching:
+    - teach
+    - teaching
+    - tutor
+    - tutoring
+    - educate
+    - educating
+    - instruction
+  
+  math:
+    - math
+    - mathematics
+    - algebra
+    - calculus
+    - geometry
+  
+  reading:
+    - reading
+    - literacy
+    - read
+  
+  language:
+    - english
+    - spanish
+    - french
+    - esl
+    - language
+  
+  gardening:
+    - garden
+    - gardening
+    - plant
+    - planting
+    - landscaping
+  
+  cooking:
+    - cook
+    - cooking
+    - bake
+    - baking
+    - kitchen
+    - meal
+  
+  driving:
+    - drive
+    - driving
+    - transport
+    - transportation
+  
+  cleaning:
+    - clean
+    - cleaning
+    - organize
+    - organizing
+  
+  coding:
+    - code
+    - coding
+    - programming
+    - software
+    - web development
+  
+  computer:
+    - computer
+    - tech support
+    - it support
+    - technical
+  
+  design:
+    - design
+    - graphic design
+    - art
+    - creative
+  
+  mentoring:
+    - mentor
+    - mentoring
+    - guide
+    - counseling
+  
+  childcare:
+    - childcare
+    - babysit
+    - kids
+    - children
+  
+  eldercare:
+    - elder
+    - senior
+    - elderly care
+
+days_of_week:
+  monday:
+    - monday
+    - mondays
+    - mon
+  
+  tuesday:
+    - tuesday
+    - tuesdays
+    - tue
+    - tues
+  
+  wednesday:
+    - wednesday
+    - wednesdays
+    - wed
+  
+  thursday:
+    - thursday
+    - thursdays
+    - thu
+    - thurs
+  
+  friday:
+    - friday
+    - fridays
+    - fri
+  
+  saturday:
+    - saturday
+    - saturdays
+    - sat
+  
+  sunday:
+    - sunday
+    - sundays
+    - sun
+
+time_periods:
+  morning:
+    - morning
+    - mornings
+    - am
+    - a.m.
+  
+  afternoon:
+    - afternoon
+    - afternoons
+    - pm
+    - p.m.
+  
+  evening:
+    - evening
+    - evenings
+    - night
+    - nights
+  
+  weekend:
+    - weekend
+    - weekends
+  
+  weekday:
+    - weekday
+    - weekdays
+
+location_types:
+  community_center:
+    - community center
+    - rec center
+    - recreation center
+  
+  library:
+    - library
+    - libraries
+  
+  school:
+    - school
+    - elementary
+    - middle school
+    - high school
+  
+  park:
+    - park
+    - parks
+    - playground
+  
+  church:
+    - church
+    - churches
+    - parish
+    - congregation
+  
+  food_bank:
+    - food bank
+    - food pantry
+    - pantry
+  
+  downtown:
+    - downtown
+    - city center
+    - main street
+  
+  neighborhood:
+    - neighborhood
+    - nearby
+    - my area
+
+# Profession to skill mapping
+professions:
+  teacher: teaching
+  programmer: coding
+  developer: coding
+  gardener: gardening
+  cook: cooking
+  chef: cooking
+  driver: driving
